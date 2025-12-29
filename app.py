@@ -5,34 +5,49 @@ from scipy.stats import norm
 from fpdf import FPDF
 import os
 
-# 1. 頁面配置與 CSS 樣式 (確保單屏全覽並優化 UI)
+# 1. 頁面配置與 CSS 樣式 (徹底解決標題遮擋與字體加大)
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 st.markdown("""<style>
-    .block-container { padding-top: 1.5rem !important; }
-    /* 確保大型字標題顯示 */
-    h2 { line-height: 1.2; font-size: 24px; text-align: center; margin-bottom: 10px; display: block !important; }
-    .section-label, [data-testid="stMetricLabel"], .stTextArea label p { font-size: 19px !important; font-weight: bold; color: #333; }
-    [data-testid="stMetricValue"] { font-size: 26px !important; font-weight: bold; color: #1f77b4 !important; }
-    .stTextArea textarea { background-attachment: local; background-size: 100% 2.2em; line-height: 2.2em !important; height: 130px !important;
+    /* 增加頂部間距，確保標題上半部不被遮擋 */
+    .main .block-container { padding-top: 4rem !important; }
+    
+    /* 大型字標題強制顯示 */
+    h2 { line-height: 1.5; font-size: 26px; text-align: center; margin-top: -2rem; margin-bottom: 20px; display: block !important; }
+    
+    /* 中型字標籤 (22px) */
+    .section-label, [data-testid="stMetricLabel"], .stTextArea label p { font-size: 22px !important; font-weight: bold; color: #333; }
+    
+    /* Target Spec 標籤與數值加大 */
+    [data-testid="stNumberInput"] label p { font-size: 24px !important; font-weight: bold; color: #d32f2f !important; }
+    [data-testid="stNumberInput"] input { font-size: 22px !important; font-weight: bold; }
+    
+    /* 結果數值 (28px) */
+    [data-testid="stMetricValue"] { font-size: 28px !important; font-weight: bold; color: #1f77b4 !important; }
+    
+    /* 結論區底線間距 */
+    .stTextArea textarea { background-attachment: local; background-size: 100% 2.2em; line-height: 2.2em !important; height: 140px !important;
         background-image: linear-gradient(to right, white 0px, transparent 0px), linear-gradient(#e0e0e0 1px, transparent 1px); }
-    div[data-testid="stDataEditor"] > div { max-height: 240px !important; }
+    
+    /* 佈局壓縮與工具列隱藏 */
+    div[data-testid="stDataEditor"] > div { max-height: 260px !important; }
     [data-testid="stElementToolbar"] { display: none !important; }
-    .element-container { margin-bottom: -15px !important; }
+    .element-container { margin-bottom: -10px !important; }
 </style>""", unsafe_allow_html=True)
 
-# 2. PDF 產生函數 (強化容錯，解決導出異常)
+# 2. PDF 產生函數 (解決新數據行導出異常)
 def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, img):
     pdf = FPDF(); pdf.add_page()
     pdf.set_font("Arial", 'B', 16); pdf.cell(190, 10, "Tolerance Stack-up Analysis Report", ln=True, align='C'); pdf.ln(2)
     pdf.set_font("Arial", 'B', 10); pdf.set_fill_color(240, 240, 240)
-    for l, v in [("Project:", proj), ("Title:", title), ("Date:", date), ("Unit:", unit), ("Target:", f"+/- {target:.3f}")]:
-        pdf.cell(40, 7, l, 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(150 if "Title" in l else 55, 7, str(v), 1, 1 if "Title" in l or "Unit" in l else 0)
+    infos = [("Project Name:", proj), ("Analysis Title:", title), ("Date:", date), ("Unit:", unit), ("Target Spec:", f"+/- {target:.3f}")]
+    for l, v in infos:
+        pdf.cell(45, 7, l, 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(145 if "Title" in l else 50, 7, str(v), 1, 1 if "Title" in l or "Unit" in l else 0)
     if img and os.path.exists(img): pdf.ln(2); pdf.image(img, x=10, w=110); pdf.ln(2)
     pdf.ln(2); pdf.set_font("Arial", 'B', 11); pdf.cell(190, 8, "Input Data Details:", ln=True)
     pdf.set_font("Arial", 'B', 9); pdf.set_fill_color(230, 230, 230)
     for h, w in [("Part", 30), ("No.", 20), ("Description", 100), ("Tol (+/-)", 40)]: pdf.cell(w, 7, h, 1, 0, 'C', True)
     pdf.ln(7); pdf.set_font("Arial", '', 9)
-    # 嚴格過濾非數字行，防止導出報錯
+    # 過濾手動輸入的無效數據列
     for _, r in df.iterrows():
         try:
             val = float(r.iloc[4])
@@ -43,7 +58,7 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
     pdf.ln(4); pdf.cell(190, 8, "Final Conclusion:", ln=True); pdf.set_font("Arial", 'I', 10); pdf.multi_cell(190, 6, concl)
     return pdf.output(dest="S").encode("latin-1")
 
-# 3. 初始化 Session State (範例刪除 Other 行)
+# 3. 初始化數據 (刪除 Other 行)
 COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差(±)"]
 def get_init_df():
     return pd.DataFrame([
@@ -84,7 +99,7 @@ with l:
             with open("uploaded_temp.png", "wb") as f: f.write(up.getbuffer())
             st.session_state.uploaded_img = "uploaded_temp.png"; st.rerun()
 
-    # 💡 數據編輯器：移除回調與 key 綁定，達成 0.1s 極速輸入
+    # 💡 數據編輯器：優化輸入流暢度
     ed_df = st.data_editor(st.session_state.df_data, num_rows="dynamic", use_container_width=True)
     st.session_state.df_data = ed_df
     
@@ -100,28 +115,28 @@ with r:
         pn, at = st.text_input("Project Name", key="proj_name"), st.text_input("Analysis Title", key="analysis_title")
         c1, c2 = st.columns(2)
         dt, ut = c1.text_input("Date", key="date"), c2.text_input("Unit", key="unit")
-    ts = st.number_input("Target Spec (±)", value=st.session_state.target_val, format="%.3f", key="target_input")
+    
+    # Target Spec 字體加大與顏色標註
+    ts = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f", key="target_input")
     st.session_state.target_val = ts
 
-    # 💡 強制即時計算 (處理手動輸入數據)
+    # 💡 強制數據即時同步
     tol_vals = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
     wc, rss = tol_vals.sum(), np.sqrt((tol_vals**2).sum())
     cpk = ts / rss if rss != 0 else 0
     yld = (2 * norm.cdf(3 * cpk) - 1) * 100
     
-    # 恢復計算標題與指標卡片
     res1, res2 = st.columns(2)
     res1.metric("Worst Case (最壞情況)", f"± {wc:.3f}"); res2.metric("RSS Total (均方根)", f"± {rss:.3f}")
     res1.metric("Est. CPK (預估 CPK)", f"{cpk:.2f}"); res2.metric("Est. Yield (預估良率)", f"{yld:.2f} %")
 
     st.divider()
     auto_con = f"1. Target +/-{ts:.3f}, CPK {cpk:.2f}, Yield {yld:.2f}%.\n2. \n3. "
-    con_in = st.text_area("✍️ Conclusion 結論 (Editable)", value=st.session_state.concl_text or auto_con, height=130, key="concl_area")
+    con_in = st.text_area("✍️ Conclusion 結論 (Editable)", value=st.session_state.concl_text or auto_con, height=140, key="concl_area")
     st.session_state.concl_text = con_in
     
-    # 💡 導出 PDF 前確保所有欄位同步
-    pdf_img = st.session_state.uploaded_img if st.session_state.uploaded_img else (display_img if (display_img and os.path.exists(display_img)) else None)
     try:
+        pdf_img = st.session_state.uploaded_img if st.session_state.uploaded_img else (display_img if (display_img and os.path.exists(display_img)) else None)
         pdf_b = create_pdf(pn, at, dt, ut, ts, wc, rss, cpk, yld, con_in, ed_df, pdf_img)
         st.download_button("📥 Export PDF Report / 匯出報告", data=pdf_b, file_name=f"Report_{pn}.pdf", use_container_width=True)
-    except: st.error("PDF Data Error... Click 'Recalculate' if you manually edited rows.")
+    except: st.error("PDF Syncing Error... Please click 'Recalculate' button above.")
