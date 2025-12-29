@@ -5,18 +5,21 @@ from scipy.stats import norm
 from fpdf import FPDF
 import os
 
-# 1. 頁面配置
+# 1. 頁面配置 (Page Config)
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 
-# 2. CSS 樣式：優化佈局與字體層次
+# 2. CSS 樣式：優化 16:9 佈局、字體層次與底線間距
 st.markdown("""
     <style>
     .block-container { padding-top: 2.5rem !important; padding-bottom: 0rem !important; }
     h2 { line-height: 1.4 !important; font-size: 26px !important; text-align: center; margin-bottom: 10px !important; }
+    
     .section-label, [data-testid="stMetricLabel"], .stTextArea label p, .stSubheader h3 { 
         font-size: 22px !important; font-weight: bold !important; color: #333 !important; margin-bottom: 5px !important;
     }
+    
     [data-testid="stMetricValue"] { font-size: 30px !important; font-weight: bold !important; color: #1f77b4 !important; }
+    
     .stTextArea textarea {
         background-attachment: local;
         background-image: linear-gradient(to right, white 0px, transparent 0px), 
@@ -24,6 +27,7 @@ st.markdown("""
                           linear-gradient(#e0e0e0 1px, transparent 1px);
         background-size: 100% 2.2em; line-height: 2.2em !important; height: 180px !important; padding-top: 8px !important;
     }
+
     [data-testid="stElementToolbar"] { display: none !important; }
     div[data-testid="stDataEditor"] > div { max-height: 280px !important; }
     .element-container { margin-bottom: -10px !important; }
@@ -31,7 +35,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. PDF 產生函數
+# 3. PDF 產生函數 (彙整全畫面 + 純英文標籤)
 def create_full_page_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, img):
     pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.add_page()
@@ -63,7 +67,7 @@ def create_full_page_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, con
         pdf.cell(100, 7, str(row.iloc[3]), 1)
         pdf.cell(40, 7, f"{row.iloc[4]:.3f}", 1, 1)
         
-    pdf.ln(4); pdf.set_font("Arial", 'B', 11); pdf.cell(190, 8, "Analysis Summary (based on RSS 3-Sigma):", ln=True)
+    pdf.ln(4); pdf.set_font("Arial", 'B', 11); pdf.cell(190, 8, "Analysis Summary (RSS 3-Sigma):", ln=True)
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(47, 10, f"Worst Case: {wc:.3f}", 1, 0, 'C'); pdf.cell(47, 10, f"RSS Total: {rss:.3f}", 1, 0, 'C')
     pdf.cell(48, 10, f"Est. CPK: {cpk:.2f}", 1, 0, 'C'); pdf.cell(48, 10, f"Est. Yield: {yld:.2f}%", 1, 1, 'C')
@@ -73,11 +77,10 @@ def create_full_page_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, con
     return pdf.output(dest="S").encode("latin-1")
 
 # 4. 初始化與 Session State
-# 調整欄位名稱至「Tol. 公差(±)」
 COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差(±)"]
 DEFAULT_DATA = [
     {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "a", COLS[3]: "Panel mark to unit mark", COLS[4]: 0.1},
-    {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "b", COLS[3]: "Unit mark to soldering pad", COLS[4]: 0.1},
+    {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "b", COLS[3]: "Unit mark to pad", COLS[4]: 0.1},
     {COLS[0]: "SMT", COLS[1]: 1.0, COLS[2]: "c", COLS[3]: "SMT tolerance", COLS[4]: 0.15},
     {COLS[0]: "Connector", COLS[1]: 1.33, COLS[2]: "d", COLS[3]: "Connector housing", COLS[4]: 0.125}
 ]
@@ -103,7 +106,7 @@ def action_all(mode):
         for k in ["proj_name", "analysis_title", "date", "unit"]: st.session_state[k] = ""
     else: init_state(reset_all=True)
 
-# 5. 主介面
+# 5. 主介面繪製
 st.markdown("<h2>設計累計公差分析工具 / Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=True)
 l_col, r_col = st.columns([1.3, 1])
 
@@ -136,6 +139,7 @@ with r_col:
     t_s = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f", key="target_input")
     st.session_state.target_val = t_s
     
+    # 計算邏輯
     wc = ed_df[COLS[4]].sum() if not ed_df.empty else 0
     rss = np.sqrt((ed_df[COLS[4]]**2).sum()) if not ed_df.empty else 0
     cpk = t_s / rss if rss != 0 else 0
@@ -149,10 +153,12 @@ with r_col:
     con_auto = f"Target +/-{t_s:.3f}, CPK {cpk:.2f}, Yield {yld:.2f}%."
     if not st.session_state.concl_text: st.session_state.concl_text = DEFAULT_CONCL_TEMPLATE.format(con_auto)
 
+    # 結論區固定顯示三行
     con_in = st.text_area("✍️ Conclusion 結論 (Editable)", value=st.session_state.concl_text, height=180, key="concl_area")
     st.session_state.concl_text = con_in
 
     try:
+        # PDF 匯出優化：緊湊間距並移除中文字元
         pdf_b = create_full_page_pdf(p_n, a_t, d_t, u_t, t_s, wc, rss, cpk, yld, con_in, ed_df, img_pdf)
         st.download_button("📥 Export PDF Report / 匯出報告", data=pdf_b, file_name=f"Report_{p_n}.pdf", use_container_width=True)
     except: st.error("PDF Exporting Error...")
