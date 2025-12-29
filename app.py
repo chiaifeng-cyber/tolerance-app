@@ -104,10 +104,11 @@ with r:
 
     
     st.divider()
-    auto_con = f"1. Target +/-{ts:.3f}, CPK {cpk:.2f}, Yield {yld:.2f}%.\n2. \n3. "
+    auto_con = f"1. When Target Spec is +/-{ts:.3f} mm, CPK {cpk:.2f}, Expected Yield {yld:.2f}%.\n2. \n3. "
     con_in = st.text_area("✍️ Conclusion 結論", value=st.session_state.concl_text or auto_con, height=160, key="concl_area")
     st.session_state.concl_text = con_in
     try:
         pdf_b = create_pdf(pn, at, dt, ut, ts, wc, rss, cpk, yld, con_in, ed_df, img)
         st.download_button("📥 Export PDF Report", data=pdf_b, file_name=f"Report_{pn}.pdf", use_container_width=True)
     except: st.error("PDF Error")
+
