@@ -149,7 +149,7 @@ with r_col:
 
     st.divider()
     # 結論區：可自定義內容，並具備 5 行高度底線
-    con_def = f"Conclusion: Target +/-{t_s:.3f}, CPK {cpk:.2f}, Yield {yld:.2f}%."
+    con_def = f"Target +/-{t_s:.3f}, CPK {cpk:.2f}, Yield {yld:.2f}%."
     con_in = st.text_area("Conclusion 結論 (Editable)", value=st.session_state.concl_text or con_def, height=180)
     st.session_state.concl_text = con_in
 
@@ -158,3 +158,4 @@ with r_col:
         pdf_b = create_pdf(p_n, a_t, d_t, u_t, t_s, wc, rss, cpk, yld, con_in, ed_df, img_pdf)
         st.download_button("📥 Export PDF Report / 匯出報告", data=pdf_b, file_name=f"Report_{p_n}.pdf", use_container_width=True)
     except: st.error("PDF Exporting Error...")
+
