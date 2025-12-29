@@ -9,33 +9,20 @@ import os
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 st.markdown("""<style>
     .stApp { background-color: #f0f2f6; }
-    .main .block-container { padding-top: 2.5rem !important; padding-bottom: 0rem !important; }
+    .main .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; }
     h2 { line-height: 1.1; font-size: 22px; text-align: center; margin-top: -1.5rem; margin-bottom: 10px; color: #333; }
-    
-    .section-label, [data-testid="stMetricLabel"], .stTextArea label p { 
-        font-size: 18px !important; font-weight: bold !important; color: #333; 
-    }
-    
-    /* 專案資訊標籤非粗體 */
+    .section-label, [data-testid="stMetricLabel"], .stTextArea label p { font-size: 18px !important; font-weight: bold !important; color: #333; }
     .stTextInput label p { font-weight: normal !important; font-size: 14px !important; }
-    
-    /* Target Spec 標籤粗體 */
     [data-testid="stNumberInput"] label p { font-size: 16px !important; font-weight: bold !important; color: #000 !important; }
-    
-    /* 輸入框樣式優化 */
-    div[data-testid="stTextInput"] input, 
-    div[data-testid="stNumberInput"] input,
-    div[data-testid="stTextArea"] textarea {
-        background-color: #ffffff !important;
-        border-radius: 8px !important;
-        padding: 5px !important;
+    div[data-testid="stTextInput"] input, div[data-testid="stNumberInput"] input, div[data-testid="stTextArea"] textarea {
+        background-color: #ffffff !important; border-radius: 8px !important; padding: 5px !important;
     }
     div[data-testid="stDataEditor"] { background-color: #ffffff !important; border-radius: 8px !important; }
     [data-testid="stMetricValue"] { font-size: 22px !important; font-weight: bold; color: #1f77b4 !important; }
     [data-testid="stElementToolbar"] { display: none !important; }
 </style>""", unsafe_allow_html=True)
 
-# 2. PDF 產生函數 (解決字元與圖片異常)
+# 2. PDF 產生函數
 def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, img):
     try:
         pdf = FPDF(); pdf.add_page()
@@ -64,7 +51,7 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
         return pdf.output(dest="S").encode("latin-1")
     except: return None
 
-# 3. 初始化數據管理
+# 3. 初始化數據
 COLS = ["Part 零件", "Req. CPK 要求 (min. 1.0)", "No. 編號", "Description 描述", "Tol. 公差(±)"]
 def get_init_df():
     return pd.DataFrame([
@@ -84,17 +71,14 @@ def action(mode):
     if mode == "clear":
         st.session_state.df_data = pd.DataFrame([{c: "" for c in COLS} for _ in range(6)])
         st.session_state.target_val, st.session_state.results = 0.0, {"wc":"", "rss":"", "cpk":"", "yld":""}
-        st.session_state.show_img = False
-        if os.path.exists("temp.png"): os.remove("temp.png")
-        st.session_state.is_cleared = True
+        st.session_state.show_img, st.session_state.is_cleared = False, True
     elif mode == "reset":
-        st.session_state.df_data = get_init_df()
-        st.session_state.target_val, st.session_state.show_img = 0.2, True
+        st.session_state.df_data, st.session_state.target_val = get_init_df(), 0.2
         st.session_state.results = {"wc": "± 0.475", "rss": "± 0.241", "cpk": "0.83", "yld": "98.72 %"}
-        st.session_state.is_cleared = False
+        st.session_state.show_img, st.session_state.is_cleared = False, False
     st.rerun()
 
-# 4. 主介面
+# 4. 主介面佈局
 st.markdown("<h2>設計累計公差分析工具 / Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=True)
 l, r = st.columns([1.3, 1])
 
@@ -113,23 +97,25 @@ with l:
     ed_df = st.data_editor(st.session_state.df_data, num_rows="dynamic", use_container_width=True)
     st.session_state.df_data = ed_df
     
+    # 💡 及時計算 Worst Case (只要表格 Tol. 有變動就連動)
+    current_tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
+    real_wc = current_tols.sum()
+
     bc1, bc2, bc3 = st.columns(3)
     bc1.button("🗑️ Clear / 全部清除", on_click=action, args=("clear",), use_container_width=True)
     
-    # 💡 重新加入計算按鈕
+    # 💡 重新計算按鈕：計算 RSS, CPK 與 Yield
     if bc2.button("🔄 Recalculate / 重新計算", use_container_width=True):
-        tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
-        wc_v, rss_v = tols.sum(), np.sqrt((tols**2).sum())
+        rss_v = np.sqrt((current_tols**2).sum())
         ts_v = st.session_state.target_val
         cpk_v = ts_v / rss_v if rss_v != 0 else 0
         st.session_state.results = {
-            "wc": f"± {wc_v:.3f}", 
+            "wc": f"± {real_wc:.3f}", 
             "rss": f"± {rss_v:.3f}", 
             "cpk": f"{cpk_v:.2f}", 
             "yld": f"{(2 * norm.cdf(3 * cpk_v) - 1) * 100:.2f} %"
         }
-        st.session_state.is_cleared = False
-        st.rerun()
+        st.session_state.is_cleared = False; st.rerun()
         
     bc3.button("⏪ Reset / 還原範例", on_click=action, args=("reset",), use_container_width=True)
 
@@ -141,9 +127,13 @@ with r:
         c1, c2 = st.columns(2)
         dt, ut = c1.text_input("Date", value="2025/12/30"), c2.text_input("Unit", value="mm")
     
-    # 調整 Target Spec 時連動清空結果
-    ts = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f", on_change=lambda: st.session_state.results.update({"wc":"","rss":"","cpk":"","yld":""}))
+    # 💡 Target Spec 變更連動：更新 Worst Case 並清空 RSS 相關數值
+    ts = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f")
     st.session_state.target_val = ts
+    
+    # 更新 session_state 中的 wc
+    if not st.session_state.is_cleared:
+        st.session_state.results["wc"] = f"± {real_wc:.3f}"
 
     res = st.session_state.results
     res1, res2 = st.columns(2)
@@ -153,8 +143,6 @@ with r:
     res2.metric("Est. Yield", res["yld"])
 
     st.divider()
-    
-    # 💡 結論區調整為四行預設格式
     con_auto = (
         f"1. Target +/-{ts:.3f}, CPK {res['cpk']}, Yield {res['yld']}.\n"
         f"2. In RSS calculation, all tolerances must be controlled with CPK ≥ 1.0.\n"
