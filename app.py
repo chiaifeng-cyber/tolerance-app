@@ -9,20 +9,17 @@ import os
 # 設定頁面為寬螢幕模式
 st.set_page_config(page_title="Tolerance Stack-up Tool", layout="wide")
 
-# --- CSS 樣式優化：修正標題切頂問題與佈局 ---
+# --- CSS 樣式優化：修正標題切頂、放大字體、一覽式佈局 ---
 st.markdown("""
     <style>
-    /* 修正頂部空白，確保標題不被切掉 */
+    /* 修正頂部空白確保標題完整 */
     .block-container { 
-        padding-top: 3rem !important; 
+        padding-top: 2.5rem !important; 
         padding-bottom: 0rem !important; 
     }
     
     /* 標題行高修正 */
-    h2 {
-        line-height: 1.5 !important;
-        margin-bottom: 10px !important;
-    }
+    h2 { line-height: 1.4 !important; }
 
     /* 結果數值：30px 加粗藍色 */
     [data-testid="stMetricValue"] {
@@ -38,97 +35,43 @@ st.markdown("""
         color: #333333 !important;
     }
     
-    /* 壓縮元件間距 */
+    /* 壓縮元件間距以符合 16:9 一覽 */
     .element-container { margin-bottom: -5px !important; }
     .stImage { margin-bottom: -10px !important; }
     
-    /* 限制資料編輯器高度以符合 16:9 */
+    /* 限制資料編輯器高度 */
     div[data-testid="stDataEditor"] > div {
         max-height: 320px !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- PDF 產生函數 (維持 A4 格式) ---
+# --- PDF 產生函數 (模擬完整 App 畫面彙整至 A4) ---
 def create_full_report_pdf(proj, title, date, unit, target, wc, rss, yield_val, cpk, df, img_path=None):
     pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.add_page()
     pdf.set_font("Arial", 'B', 18)
     pdf.cell(190, 15, txt="Design Tolerance Analysis Report", ln=True, align='C')
-    pdf.ln(5)
+    pdf.ln(2)
+
+    # 專案資訊
     pdf.set_font("Arial", 'B', 10)
     pdf.set_fill_color(230, 230, 230)
-    pdf.cell(45, 8, "Project", 1, 0, 'L', True); pdf.cell(145, 8, proj, 1, 1)
-    pdf.cell(45, 8, "Title", 1, 0, 'L', True); pdf.cell(145, 8, title, 1, 1)
+    pdf.cell(45, 8, "Project", 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(50, 8, proj, 1)
+    pdf.set_font("Arial", 'B', 10); pdf.cell(45, 8, "Date", 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(50, 8, date, 1, 1)
+    pdf.set_font("Arial", 'B', 10); pdf.cell(45, 8, "Title", 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(50, 8, title, 1)
+    pdf.set_font("Arial", 'B', 10); pdf.cell(45, 8, "Unit", 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(50, 8, unit, 1, 1)
     pdf.ln(5)
+
+    # 示意圖
     if img_path and os.path.exists(img_path):
-        # 確保圖片在 PDF 中正確顯示
-        pdf.image(img_path, x=10, w=140)
-        pdf.ln(75)
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(190, 10, "Summary Results:", ln=True)
-    pdf.cell(63, 10, f"Worst Case: +/- {wc:.3f}", 1); pdf.cell(63, 10, f"RSS Total: +/- {rss:.3f}", 1); pdf.cell(64, 10, f"Yield: {yield_val:.2f}%", 1, 1)
-    return pdf.output(dest="S").encode("latin-1")
+        pdf.set_font("Arial", 'B', 11)
+        pdf.cell(190, 8, "Example Diagram:", ln=True)
+        pdf.image(img_path, x=10, w=130)
+        pdf.ln(70)
 
-# --- 資料初始化 ---
-DEFAULT_DATA = [
-    {"Part": "PCB", "No.": "a", "Description": "Panel mark to unit mark", "Upper Tol": 0.100},
-    {"Part": "PCB", "No.": "b", "Description": "Unit mark to soldering pad", "Upper Tol": 0.100},
-    {"Part": "SMT", "No.": "c", "Description": "SMT tolerance", "Upper Tol": 0.150},
-    {"Part": "Connector", "No.": "d", "Description": "Connector housing", "Upper Tol": 0.125},
-]
-
-if 'df_data' not in st.session_state:
-    st.session_state.df_data = pd.DataFrame(DEFAULT_DATA)
-
-def clear_all(): 
-    st.session_state.df_data = pd.DataFrame(columns=["Part", "No.", "Description", "Upper Tol"])
-
-def reset_default(): 
-    st.session_state.df_data = pd.DataFrame(DEFAULT_DATA)
-
-# --- 主介面佈局 (左右分欄) ---
-st.markdown("<h2 style='text-align: center;'>設計累計公差分析工具</h2>", unsafe_allow_html=True)
-
-left_col, right_col = st.columns([1.2, 1])
-
-with left_col:
-    st.subheader("🖼️ 範例示意與數據輸入")
-    img_filename = "4125.jpg"
-    if os.path.exists(img_filename):
-        st.image(img_filename, use_container_width=True)
-    else:
-        st.info("請將範例圖 4125.jpg 上傳至 GitHub 儲存庫。")
-    
-    c1, c2, _ = st.columns([1, 1, 2])
-    with c1: st.button("🗑️ 清除資料", on_click=clear_all, use_container_width=True)
-    with c2: st.button("🔄 還原範例", on_click=reset_default, use_container_width=True)
-    
-    edited_df = st.data_editor(st.session_state.df_data, num_rows="dynamic", use_container_width=True)
-    st.session_state.df_data = edited_df
-
-with right_col:
-    st.subheader("📋 專案資訊與結果")
-    with st.container(border=True):
-        proj_name = st.text_input("專案名稱", "TM-P4125-001")
-        title_text = st.text_input("分析標題", "Connector Y-Position Analysis")
-        c1, c2 = st.columns(2)
-        with c1: date_text = st.text_input("日期", "2025/12/29")
-        with c2: unit_text = st.text_input("單位", "mm")
-
-    st.divider()
-    
-    target_spec = st.number_input("設計公差目標 (Target Spec ±)", value=0.200, format="%.3f")
-    
-    if not edited_df.empty and "Upper Tol" in edited_df.columns:
-        wc = edited_df["Upper Tol"].sum()
-        rss = np.sqrt((edited_df["Upper Tol"]**2).sum())
-        cpk = target_spec / rss if rss != 0 else 0
-        z_score = 3 * cpk
-        yield_val = (2 * norm.cdf(z_score) - 1) * 100
-    else:
-        wc, rss, cpk, yield_val = 0, 0, 0, 0
-
-    st.metric("Worst Case (最壞情況)", f"± {wc:.3f} {unit_text}")
-    st.metric("RSS Total (均方根)", f"± {rss:.3f} {unit_text}")
-    st.metric("預估良率 (Estimated Yield)", f"{
+    # 數據表格
+    pdf.set_font("Arial", 'B', 11)
+    pdf.cell(190, 8, "Input Data:", ln=True)
+    pdf.set_font("Arial", 'B', 9); pdf.set_fill_color(245, 245, 245)
+    pdf.cell(30, 7, "Part", 1, 0, 'C', True); pdf.cell(20, 7, "No.", 1, 0, 'C', True); pdf.cell(100, 7, "Description", 1, 0, 'C', True); pdf.cell(40, 7, "Tol (+/-)", 1, 1
