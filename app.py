@@ -166,9 +166,10 @@ with r:
     st.markdown('<p class="section-label">✍️ Conclusion</p>', unsafe_allow_html=True)
     with st.container(border=True):
         con_auto = (
-            f"1. If target spec is +/-{ts:.3f}, Estimated CPK {cpk_v:.2f}, Estimated Yield {yld_v:.2f}%.\n"
+            f"1. If the target spec is +/-{ts:.3f}, the estimated CPK is {cpk_v:.2f} and the estimated yield is {yld_v:.2f}%.\n"
             f"2. Use the RSS method for the spec. All calculated tolerances must meet a minimum Cpk of 1.0."
         )
         st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=100, label_visibility="collapsed")
+
 
 
