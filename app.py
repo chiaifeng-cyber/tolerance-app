@@ -35,7 +35,7 @@ st.markdown("""<style>
     [data-testid="stElementToolbar"] { display: none !important; }
 </style>""", unsafe_allow_html=True)
 
-# 2. PDF 產生函數
+# 2. PDF 產生函數 (純英文報告彙整)
 def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, img):
     pdf = FPDF(); pdf.add_page()
     pdf.set_font("Arial", 'B', 16); pdf.cell(190, 10, "Tolerance Stack-up Analysis Report", ln=True, align='C'); pdf.ln(5)
@@ -61,7 +61,7 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
     pdf.ln(5); pdf.cell(190, 8, "Final Conclusion:", ln=True); pdf.set_font("Arial", 'I', 10); pdf.multi_cell(190, 6, concl)
     return pdf.output(dest="S").encode("latin-1")
 
-# 3. 初始化數據管理 (更新標題名稱)
+# 3. 初始化數據管理
 COLS = ["Part 零件", "Req. CPK 要求 (min. 1.0)", "No. 編號", "Description 描述", "Tol. 公差(±)"]
 def get_init_df():
     return pd.DataFrame([
@@ -94,6 +94,10 @@ def action(mode):
         st.session_state.show_img, st.session_state.is_cleared = True, False
     st.rerun()
 
+# 💡 監聽 Target Spec 變動：調整數值時清空計算結果
+def on_target_change():
+    st.session_state.results = {"wc": "", "rss": "", "cpk": "", "yld": ""}
+
 # 4. 主介面
 st.markdown("<h2>設計累計公差分析工具 / Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=True)
 l, r = st.columns([1.3, 1])
@@ -115,8 +119,8 @@ with l:
     
     bc1, bc2, bc3 = st.columns(3)
     bc1.button("🗑️ Clear / 全部清除", on_click=action, args=("clear",), use_container_width=True)
+    
     if bc2.button("🔄 Recalculate / 重新計算", use_container_width=True):
-        # 💡 使用更新後的列標題抓取數據
         tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
         wc_v, rss_v = tols.sum(), np.sqrt((tols**2).sum())
         ts_v = st.session_state.target_val
@@ -135,7 +139,8 @@ with r:
         st.session_state.date = c1.text_input("Date", value=st.session_state.date)
         st.session_state.unit = c2.text_input("Unit", value=st.session_state.unit)
     
-    st.session_state.target_val = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f")
+    # 💡 綁定變動事件：當調整公差目標時，清空下方計算數值
+    st.session_state.target_val = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f", on_change=on_target_change)
 
     res1, res2 = st.columns(2)
     res1.metric("Worst Case", st.session_state.results["wc"])
@@ -143,9 +148,12 @@ with r:
     res1.metric("Est. CPK", st.session_state.results["cpk"])
     res2.metric("Est. Yield", st.session_state.results["yld"])
 
+    
+
     st.divider()
-    con_auto = f"1. Target +/-{st.session_state.target_val:.3f}, CPK {st.session_state.results['cpk']}, Yield {st.session_state.results['yld']}."
-    con_in = st.text_area("✍️ Conclusion 結論", value=con_auto if not st.session_state.is_cleared else "", height=100)
+    # 💡 結論區：自動加入第二點規範說明
+    con_auto = f"1. Target +/-{st.session_state.target_val:.3f}, CPK {st.session_state.results['cpk']}, Yield {st.session_state.results['yld']}.\n2. In RSS calculation, all tolerances must be controlled with CPK ≥ 1.0.\n3. "
+    con_in = st.text_area("✍️ Conclusion 結論", value=con_auto if not st.session_state.is_cleared else "", height=120)
     
     res = st.session_state.results
     pdf_b = create_pdf(st.session_state.proj_name, st.session_state.analysis_title, st.session_state.date, st.session_state.unit, st.session_state.target_val, res["wc"], res["rss"], res["cpk"], res["yld"], con_in, ed_df, current_img if st.session_state.show_img else None)
