@@ -5,27 +5,24 @@ from scipy.stats import norm
 from fpdf import FPDF
 import os
 
-# 1. 頁面配置與進階 CSS 樣式 (優化視窗大小與字體)
+# 1. 頁面配置與進階 CSS 樣式
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 st.markdown("""<style>
     .stApp { background-color: #f0f2f6; }
-    /* 縮小頂部邊距以符合 Window 介面全覽 */
     .main .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; }
-    
     h2 { line-height: 1.1; font-size: 22px; text-align: center; margin-top: -1rem; margin-bottom: 10px; color: #333; }
     
-    /* 區域標籤樣式 (縮小至 18px) */
     .section-label, [data-testid="stMetricLabel"], .stTextArea label p { 
         font-size: 18px !important; font-weight: bold !important; color: #333; 
     }
     
-    /* 1. Project Name 等資訊標籤設定為「非粗體」 */
+    /* 專案資訊標籤非粗體 */
     .stTextInput label p { font-weight: normal !important; font-size: 14px !important; }
     
-    /* Target Spec 標籤保持粗體但縮小 */
+    /* Target Spec 標籤粗體 */
     [data-testid="stNumberInput"] label p { font-size: 16px !important; font-weight: bold !important; color: #000 !important; }
     
-    /* 圓角反白輸入框與數據編輯器高度壓縮 */
+    /* 圓角反白輸入框 */
     div[data-testid="stTextInput"] input, 
     div[data-testid="stNumberInput"] input,
     div[data-testid="stTextArea"] textarea {
@@ -34,21 +31,18 @@ st.markdown("""<style>
         padding: 5px !important;
     }
     div[data-testid="stDataEditor"] { background-color: #ffffff !important; border-radius: 8px !important; }
-    
-    /* Metric 數值大小縮小以節省空間 */
     [data-testid="stMetricValue"] { font-size: 22px !important; font-weight: bold; color: #1f77b4 !important; }
     [data-testid="stElementToolbar"] { display: none !important; }
 </style>""", unsafe_allow_html=True)
 
-# 2. PDF 產生函數 (強化對圖片路徑的檢查避免報錯)
+# 2. PDF 產生函數
 def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, img):
     pdf = FPDF(); pdf.add_page()
     pdf.set_font("Arial", 'B', 16); pdf.cell(190, 10, "Tolerance Stack-up Analysis Report", ln=True, align='C'); pdf.ln(5)
     pdf.set_font("Arial", 'B', 10); pdf.set_fill_color(240, 240, 240)
     for l, v in [("Project:", proj), ("Title:", title), ("Date:", date), ("Unit:", unit), ("Target Spec:", f"+/- {target:.3f}")]:
-        pdf.cell(40, 7, l, 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(150 if "Title" in l else 55, 7, str(v), 1, 1 if "Title" in l or "Unit" in l else 0)
+        pdf.cell(40, 7, l, 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(145 if "Title" in l else 50, 7, str(v), 1, 1 if "Title" in l or "Unit" in l else 0)
     
-    # 💡 檢查圖片路徑是否存在，避免引發紅字 Runtime錯誤
     if img and isinstance(img, str) and os.path.exists(img):
         try: pdf.ln(5); pdf.image(img, x=10, w=100); pdf.ln(5)
         except: pass
@@ -67,8 +61,8 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
     pdf.ln(5); pdf.cell(190, 8, "Final Conclusion:", ln=True); pdf.set_font("Arial", 'I', 10); pdf.multi_cell(190, 6, concl)
     return pdf.output(dest="S").encode("latin-1")
 
-# 3. 初始化數據管理
-COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差(±)"]
+# 3. 初始化數據管理 (更新標題名稱)
+COLS = ["Part 零件", "Req. CPK 要求 (min. 1.0)", "No. 編號", "Description 描述", "Tol. 公差(±)"]
 def get_init_df():
     return pd.DataFrame([
         {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "a", COLS[3]: "Panel mark to unit mark", COLS[4]: 0.1},
@@ -122,6 +116,7 @@ with l:
     bc1, bc2, bc3 = st.columns(3)
     bc1.button("🗑️ Clear / 全部清除", on_click=action, args=("clear",), use_container_width=True)
     if bc2.button("🔄 Recalculate / 重新計算", use_container_width=True):
+        # 💡 使用更新後的列標題抓取數據
         tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
         wc_v, rss_v = tols.sum(), np.sqrt((tols**2).sum())
         ts_v = st.session_state.target_val
@@ -134,7 +129,6 @@ with l:
 with r:
     st.markdown('<p class="section-label">📋 Project information / 專案資訊</p>', unsafe_allow_html=True)
     with st.container(border=True):
-        # 💡 使用 session_state 綁定，確保清除動作能即時反映在畫面上
         st.session_state.proj_name = st.text_input("Project Name", value=st.session_state.proj_name)
         st.session_state.analysis_title = st.text_input("Analysis Title", value=st.session_state.analysis_title)
         c1, c2 = st.columns(2)
@@ -149,7 +143,6 @@ with r:
     res1.metric("Est. CPK", st.session_state.results["cpk"])
     res2.metric("Est. Yield", st.session_state.results["yld"])
 
-    
     st.divider()
     con_auto = f"1. Target +/-{st.session_state.target_val:.3f}, CPK {st.session_state.results['cpk']}, Yield {st.session_state.results['yld']}."
     con_in = st.text_area("✍️ Conclusion 結論", value=con_auto if not st.session_state.is_cleared else "", height=100)
