@@ -43,10 +43,12 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
     return pdf.output(dest="S").encode("latin-1")
 
 # 3. 初始化數據與 Session State
-COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Upper Tol 上限公差"]
+COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差"]
 DEFAULT_DATA = [
-    {"Part 零件": "PCB", "Req. CPK 要求": 1.33, "No. 編號": "a", "Description 描述": "Panel mark", "Upper Tol 上限公差": 0.1},
-    {"Part 零件": "Connector", "Req. CPK 要求": 1.33, "No. 編號": "d", "Description 描述": "Housing", "Upper Tol 上限公差": 0.125}
+    {"Part 零件": "PCB", "Req. CPK 要求": 1.33, "No. 編號": "a", "Description 描述": "Panel mark to unit mark", "Tol. ±公差": 0.1},
+    {"Part 零件": "PCB", "Req. CPK 要求": 1.33, "No. 編號": "b", "Description 描述": "Unit mark to soldering pad", "Tol. ±公差": 0.10}
+    {"Part 零件": "SMT", "Req. CPK 要求": 1.33, "No. 編號": "d", "Description 描述": "SMT", "Tol. 公差": 0.15}
+    {"Part 零件": "Connector", "Req. CPK 要求": 1.33, "No. 編號": "d", "Description 描述": "Connector housing (0.25/2)", "Tol. ±公差": 0.125}
 ]
 
 for key, val in {"df_data": pd.DataFrame(DEFAULT_DATA), "target_val": 0.2, "proj_name": "TM-P4125-001", 
@@ -118,3 +120,4 @@ with r_col:
         pdf_b = create_pdf(p_n, a_t, d_t, u_t, t_s, wc, rss, cpk, yld, con_in, ed_df, img_path)
         st.download_button("📥 Export PDF Report / 匯出報告", data=pdf_b, file_name=f"Report_{p_n}.pdf", use_container_width=True)
     except: st.error("PDF Exporting...")
+
