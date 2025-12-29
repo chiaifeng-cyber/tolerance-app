@@ -8,14 +8,18 @@ import os
 # 1. 頁面配置 (Page Config)
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 
-# 2. CSS 樣式：優化佈局與結論區底線
+# 2. CSS 樣式：優化佈局、結論區底線、並強制結論區上移
 st.markdown("""
     <style>
-    .block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; }
-    h2 { line-height: 1.6 !important; font-size: 26px !important; text-align: center; margin-bottom: 10px !important; }
+    /* 修正頂部邊距確保標題不切頂 */
+    .block-container { padding-top: 3.0rem !important; padding-bottom: 0rem !important; }
+    
+    /* 標題與標籤雙語字體放大 */
+    h2 { line-height: 1.4 !important; font-size: 26px !important; text-align: center; margin-bottom: 10px !important; }
     [data-testid="stMetricLabel"] { font-size: 20px !important; font-weight: bold !important; color: #333 !important; }
     [data-testid="stMetricValue"] { font-size: 30px !important; font-weight: bold !important; color: #1f77b4 !important; }
     
+    /* 結論區底線間距優化 */
     .stTextArea textarea {
         background-attachment: local;
         background-image: linear-gradient(to right, white 0px, transparent 0px), 
@@ -26,13 +30,18 @@ st.markdown("""
         height: 180px !important;
         padding-top: 8px !important;
     }
+
+    /* 隱藏表格工具列與壓縮間距 */
     [data-testid="stElementToolbar"] { display: none !important; }
     div[data-testid="stDataEditor"] > div { max-height: 280px !important; }
-    .element-container { margin-bottom: -5px !important; }
+    .element-container { margin-bottom: -10px !important; }
+    
+    /* 強制將結論區區塊上移，縮小 Divider 空間 */
+    hr { margin-top: 0.3rem !important; margin-bottom: 0.3rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. PDF 產生函數
+# 3. PDF 產生函數 (純英文報告輸出)
 def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, img):
     pdf = FPDF()
     pdf.add_page()
@@ -63,24 +72,26 @@ DEFAULT_DATA = [
     {COLS[0]: "Connector", COLS[1]: 1.33, COLS[2]: "d", COLS[3]: "Connector housing", COLS[4]: 0.125}
 ]
 
-# 初始化函數
-def init_state(reset_data=False):
-    if 'df_data' not in st.session_state or reset_data:
+# 預設結論條列格式
+DEFAULT_CONCL = "1. \n2. \n3. \n4. \n5. "
+
+def init_state(reset_all=False):
+    if 'df_data' not in st.session_state or reset_all:
         st.session_state.df_data = pd.DataFrame(DEFAULT_DATA)
-    if 'target_val' not in st.session_state or reset_data:
+    if 'target_val' not in st.session_state or reset_all:
         st.session_state.target_val = 0.2
-    if 'proj_name' not in st.session_state or reset_data:
+    if 'proj_name' not in st.session_state or reset_all:
         st.session_state.proj_name = "TM-P4125-001"
-    if 'analysis_title' not in st.session_state or reset_data:
+    if 'analysis_title' not in st.session_state or reset_all:
         st.session_state.analysis_title = "Connector Analysis"
-    if 'date' not in st.session_state or reset_data:
+    if 'date' not in st.session_state or reset_all:
         st.session_state.date = "2025/12/29"
-    if 'unit' not in st.session_state or reset_data:
+    if 'unit' not in st.session_state or reset_all:
         st.session_state.unit = "mm"
-    if 'show_img' not in st.session_state or reset_data:
+    if 'show_img' not in st.session_state or reset_all:
         st.session_state.show_img = True
-    # 結論區預設格式
-    st.session_state.concl_text = "1. \n2. \n3. "
+    if 'concl_text' not in st.session_state or reset_all:
+        st.session_state.concl_text = DEFAULT_CONCL
 
 init_state()
 
@@ -89,13 +100,11 @@ def action_all(mode):
         st.session_state.df_data = pd.DataFrame(columns=COLS)
         st.session_state.target_val = 0.0
         st.session_state.show_img = False
-        st.session_state.proj_name = ""
-        st.session_state.analysis_title = ""
-        st.session_state.date = ""
-        st.session_state.unit = ""
-        st.session_state.concl_text = "1. \n2. \n3. "
+        st.session_state.proj_name, st.session_state.analysis_title = "", ""
+        st.session_state.date, st.session_state.unit = "", ""
+        st.session_state.concl_text = DEFAULT_CONCL
     else: # reset
-        init_state(reset_data=True)
+        init_state(reset_all=True)
 
 # 5. 主介面繪製
 st.markdown("<h2>設計累計公差分析工具 / Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=True)
@@ -107,12 +116,13 @@ with l_col:
     if img_pdf:
         st.image(img_pdf, use_container_width=True)
     else:
-        up = st.file_uploader("Upload New Diagram / 上傳新示意圖", type=["jpg", "png"])
+        up = st.file_uploader("Upload New Diagram", type=["jpg", "png"])
         if up:
             st.image(up, use_container_width=True)
             with open("temp.png", "wb") as f: f.write(up.getbuffer())
             img_pdf = "temp.png"
 
+    # 使用 key 綁定 session_state 確保 reset 時資料同步更新
     ed_df = st.data_editor(st.session_state.df_data, num_rows="dynamic", use_container_width=True, hide_index=False, key="main_editor")
     st.session_state.df_data = ed_df
     st.caption("💡 點擊左側序號選取該列，按 Delete 鍵即可刪除。")
@@ -133,7 +143,7 @@ with r_col:
     t_s = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f", key="target_input")
     st.session_state.target_val = t_s
     
-    # 即時計算邏輯
+    # 計算邏輯：直接抓取 ed_df 確保數據還原後即時計算
     wc = ed_df[COLS[4]].sum() if not ed_df.empty else 0
     rss = np.sqrt((ed_df[COLS[4]]**2).sum()) if not ed_df.empty else 0
     cpk = t_s / rss if rss != 0 else 0
@@ -145,8 +155,8 @@ with r_col:
     res_c1.metric("Est. CPK (預估 CPK)", f"{cpk:.2f}")
     res_c2.metric("Est. Yield (預估良率)", f"{yld:.2f} %")
 
+    # 結論區：上移佈局與 1. 2. 3. 4. 5. 格式
     st.divider()
-    # 結論區預設顯示 1. 2. 3.
     con_in = st.text_area("Conclusion 結論 (Editable)", value=st.session_state.concl_text, height=180, key="concl_area")
     st.session_state.concl_text = con_in
 
@@ -154,3 +164,4 @@ with r_col:
         pdf_b = create_pdf(p_n, a_t, d_t, u_t, t_s, wc, rss, cpk, yld, con_in, ed_df, img_pdf)
         st.download_button("📥 Export PDF Report / 匯出報告", data=pdf_b, file_name=f"Report_{p_n}.pdf", use_container_width=True)
     except: st.error("PDF Exporting Error...")
+
