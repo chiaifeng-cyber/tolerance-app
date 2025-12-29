@@ -11,14 +11,13 @@ st.set_page_config(page_title="Tolerance Tool", layout="wide")
 # 2. CSS 樣式：精確控制字體層次與佈局優化
 st.markdown("""
     <style>
-    /* 修正頂部邊距 */
+    /* 修正頂部邊距確保 16:9 一畫面全覽 */
     .block-container { padding-top: 2.5rem !important; padding-bottom: 0rem !important; }
     
     /* 大型字 (Title): 26px 加粗 */
     h2 { line-height: 1.4 !important; font-size: 26px !important; text-align: center; margin-bottom: 10px !important; }
     
-    /* 中型字 (Labels): 22px 加粗 - 強制覆蓋所有標籤 */
-    /* 包含區域標籤、Metric 標籤、以及關鍵的結論區標籤 (TextArea Label) */
+    /* 中型字 (Labels): 22px 加粗 - 強制覆蓋所有區域標籤與結論區標籤 */
     .section-label, 
     [data-testid="stMetricLabel"], 
     .stTextArea label p, 
@@ -32,7 +31,7 @@ st.markdown("""
     /* 結果數值字體: 30px 加粗藍色 */
     [data-testid="stMetricValue"] { font-size: 30px !important; font-weight: bold !important; color: #1f77b4 !important; }
     
-    /* 結論區底線間距優化 */
+    /* 結論區底線間距優化：拉開文字與線的距離 */
     .stTextArea textarea {
         background-attachment: local;
         background-image: linear-gradient(to right, white 0px, transparent 0px), 
@@ -44,7 +43,7 @@ st.markdown("""
         padding-top: 8px !important;
     }
 
-    /* 佈局壓縮 */
+    /* 隱藏表格工具列並壓縮間距 */
     [data-testid="stElementToolbar"] { display: none !important; }
     div[data-testid="stDataEditor"] > div { max-height: 280px !important; }
     .element-container { margin-bottom: -10px !important; }
@@ -82,7 +81,8 @@ DEFAULT_DATA = [
     {COLS[0]: "SMT", COLS[1]: 1.0, COLS[2]: "c", COLS[3]: "SMT tolerance", COLS[4]: 0.15},
     {COLS[0]: "Connector", COLS[1]: 1.33, COLS[2]: "d", COLS[3]: "Connector housing", COLS[4]: 0.125}
 ]
-DEFAULT_CONCL = "1. \n2. \n3. \n4. \n5. "
+# 預設結論條列格式
+DEFAULT_CONCL_TEMPLATE = "1. {}\n2. \n3. \n4. \n5. "
 
 def init_state(reset_all=False):
     if 'df_data' not in st.session_state or reset_all:
@@ -99,8 +99,8 @@ def init_state(reset_all=False):
         st.session_state.unit = "mm"
     if 'show_img' not in st.session_state or reset_all:
         st.session_state.show_img = True
-    if 'concl_text' not in st.session_state or reset_all:
-        st.session_state.concl_text = DEFAULT_CONCL
+    # 結論區內容初始化
+    st.session_state.concl_text = ""
 
 init_state()
 
@@ -111,7 +111,7 @@ def action_all(mode):
         st.session_state.show_img = False
         st.session_state.proj_name, st.session_state.analysis_title = "", ""
         st.session_state.date, st.session_state.unit = "", ""
-        st.session_state.concl_text = DEFAULT_CONCL
+        st.session_state.concl_text = ""
     else: init_state(reset_all=True)
 
 # 5. 主介面繪製
@@ -150,7 +150,7 @@ with r_col:
     t_s = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f", key="target_input")
     st.session_state.target_val = t_s
     
-    # 計算邏輯
+    # 即時計算邏輯
     wc = ed_df[COLS[4]].sum() if not ed_df.empty else 0
     rss = np.sqrt((ed_df[COLS[4]]**2).sum()) if not ed_df.empty else 0
     cpk = t_s / rss if rss != 0 else 0
@@ -163,7 +163,15 @@ with r_col:
     res_c2.metric("Est. Yield (預估良率)", f"{yld:.2f} %")
 
     st.divider()
-    # ✍️ 結論區標籤：CSS 已精確鎖定字體至 22px 加粗
+    
+    # --- 結論自動計算段落 ---
+    con_def = f"Target +/-{t_s:.3f}, CPK {cpk:.2f}, Yield {yld:.2f}%."
+    
+    # 若結論區為空，則填入預設的 1. 2. 3. 模板並帶入計算結果
+    if not st.session_state.concl_text or st.session_state.concl_text.strip() == "":
+        st.session_state.concl_text = DEFAULT_CONCL_TEMPLATE.format(con_def)
+
+    # ✍️ 結論區標籤 (22px 中型字)
     con_in = st.text_area("✍️ Conclusion 結論 (Editable)", value=st.session_state.concl_text, height=180, key="concl_area")
     st.session_state.concl_text = con_in
 
