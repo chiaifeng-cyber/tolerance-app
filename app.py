@@ -11,7 +11,11 @@ st.markdown("""<style>
     .stApp { background-color: #f0f2f6; }
     .main .block-container { padding-top: 3rem !important; }
     h2 { line-height: 1.2; font-size: 24px; text-align: center; margin-top: -1.5rem; color: #333; }
-    .section-label, [data-testid="stMetricLabel"], .stTextArea label p { font-size: 20px !important; font-weight: bold; color: #333; }
+    
+    /* 區域標籤樣式與粗體化 */
+    .section-label, [data-testid="stMetricLabel"], .stTextArea label p, .stTextInput label p { 
+        font-size: 19px !important; font-weight: bold !important; color: #333; 
+    }
     
     /* Target Spec 標籤設定為粗體字 */
     [data-testid="stNumberInput"] label p { font-size: 18px !important; font-weight: bold !important; color: #000 !important; }
@@ -36,7 +40,7 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
     pdf.set_font("Arial", 'B', 16); pdf.cell(190, 10, "Tolerance Stack-up Analysis Report", ln=True, align='C'); pdf.ln(5)
     pdf.set_font("Arial", 'B', 10); pdf.set_fill_color(240, 240, 240)
     for l, v in [("Project:", proj), ("Title:", title), ("Date:", date), ("Unit:", unit), ("Target Spec:", f"+/- {target:.3f}")]:
-        pdf.cell(40, 7, l, 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(150 if "Title" in l else 55, 7, str(v), 1, 1 if "Title" in l or "Unit" in l else 0)
+        pdf.cell(40, 7, l, 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(145 if "Title" in l else 50, 7, str(v), 1, 1 if "Title" in l or "Unit" in l else 0)
     if img and os.path.exists(img): pdf.ln(5); pdf.image(img, x=10, w=100); pdf.ln(5)
     pdf.ln(2); pdf.set_font("Arial", 'B', 11); pdf.cell(190, 8, "Input Data Details:", ln=True)
     pdf.set_font("Arial", 'B', 9); pdf.set_fill_color(230, 230, 230)
@@ -52,7 +56,7 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
     pdf.ln(5); pdf.cell(190, 8, "Final Conclusion:", ln=True); pdf.set_font("Arial", 'I', 10); pdf.multi_cell(190, 6, concl)
     return pdf.output(dest="S").encode("latin-1")
 
-# 3. 初始化數據
+# 3. 初始化數據管理
 COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差(±)"]
 def get_init_df():
     return pd.DataFrame([
@@ -62,8 +66,13 @@ def get_init_df():
         {COLS[0]: "Connector", COLS[1]: 1.33, COLS[2]: "d", COLS[3]: "Connector housing", COLS[4]: 0.125}
     ])
 
+# Session State 管理，加入專案資訊變數
 if 'df_data' not in st.session_state:
     st.session_state.df_data = get_init_df()
+    st.session_state.proj_name = "TM-P4125-001"
+    st.session_state.analysis_title = "Connector Analysis"
+    st.session_state.date = "2025/12/30"
+    st.session_state.unit = "mm"
     st.session_state.target_val = 0.2
     st.session_state.results = {"wc": "± 0.475", "rss": "± 0.241", "cpk": "0.83", "yld": "98.72 %"}
     st.session_state.show_img = True
@@ -72,27 +81,33 @@ if 'df_data' not in st.session_state:
 def action(mode):
     if mode == "clear":
         st.session_state.df_data = pd.DataFrame([{c: "" for c in COLS} for _ in range(6)])
+        st.session_state.proj_name = ""
+        st.session_state.analysis_title = ""
+        st.session_state.date = ""
+        st.session_state.unit = ""
         st.session_state.target_val = 0.0
         st.session_state.results = {"wc": "", "rss": "", "cpk": "", "yld": ""}
-        st.session_state.show_img = False # 💡 全部清除時隱藏圖片
-        if os.path.exists("temp.png"): os.remove("temp.png") # 💡 刪除暫存上傳圖
+        st.session_state.show_img = False
+        if os.path.exists("temp.png"): os.remove("temp.png")
         st.session_state.is_cleared = True
     elif mode == "reset":
         st.session_state.df_data = get_init_df()
+        st.session_state.proj_name = "TM-P4125-001"
+        st.session_state.analysis_title = "Connector Analysis"
+        st.session_state.date = "2025/12/30"
+        st.session_state.unit = "mm"
         st.session_state.target_val = 0.2
         st.session_state.results = {"wc": "± 0.475", "rss": "± 0.241", "cpk": "0.83", "yld": "98.72 %"}
         st.session_state.show_img = True
         st.session_state.is_cleared = False
     st.rerun()
 
-# 4. 主介面繪製
+# 4. 主介面
 st.markdown("<h2>設計累計公差分析工具 / Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=True)
 l, r = st.columns([1.3, 1])
 
 with l:
     st.markdown('<p class="section-label">🖼️ Diagram & Input / 示意圖與數據輸入</p>', unsafe_allow_html=True)
-    
-    # 💡 圖片顯示邏輯 (受 show_img 控制)
     up = st.file_uploader("Upload Image", type=["jpg", "png"], label_visibility="collapsed")
     current_img = None
     if up:
@@ -100,16 +115,9 @@ with l:
         st.session_state.show_img = True
     
     if st.session_state.show_img:
-        if os.path.exists("temp.png"):
-            current_img = "temp.png"
-        elif os.path.exists("4125.jpg"):
-            current_img = "4125.jpg"
-        
+        current_img = "temp.png" if os.path.exists("temp.png") else ("4125.jpg" if os.path.exists("4125.jpg") else None)
         if current_img:
             st.image(current_img, use_container_width=True)
-            if st.button("🗑️ Remove Diagram"):
-                st.session_state.show_img = False
-                st.rerun()
 
     ed_df = st.data_editor(st.session_state.df_data, num_rows="dynamic", use_container_width=True)
     st.session_state.df_data = ed_df
@@ -131,14 +139,18 @@ with l:
     bc3.button("⏪ Reset / 還原範例", on_click=action, args=("reset",), use_container_width=True)
 
 with r:
-    st.markdown('<p class="section-label">📋 Info & Results / 專案資訊與結果</p>', unsafe_allow_html=True)
+    # 變更後的標題
+    st.markdown('<p class="section-label">📋 Project information / 專案資訊</p>', unsafe_allow_html=True)
     with st.container(border=True):
-        pn = st.text_input("Project Name", value="TM-P4125-001")
-        at = st.text_input("Analysis Title", value="Connector Analysis")
+        pn = st.text_input("Project Name", value=st.session_state.proj_name, key="pn_input")
+        at = st.text_input("Analysis Title", value=st.session_state.analysis_title, key="at_input")
         c1, c2 = st.columns(2)
-        dt, ut = c1.text_input("Date", value="2025/12/30"), c2.text_input("Unit", value="mm")
+        dt = c1.text_input("Date", value=st.session_state.date, key="dt_input")
+        ut = c2.text_input("Unit", value=st.session_state.unit, key="ut_input")
+        # 同步回 session_state
+        st.session_state.proj_name, st.session_state.analysis_title = pn, at
+        st.session_state.date, st.session_state.unit = dt, ut
     
-    # 💡 標籤字體已由 CSS 設定為粗體
     ts = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f")
     st.session_state.target_val = ts
 
