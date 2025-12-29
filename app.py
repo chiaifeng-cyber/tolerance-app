@@ -4,6 +4,7 @@ import numpy as np
 from scipy.stats import norm
 from fpdf import FPDF
 import datetime
+import os
 
 # 設定頁面
 st.set_page_config(page_title="Tolerance Stack-up Tool", layout="wide")
@@ -11,73 +12,98 @@ st.set_page_config(page_title="Tolerance Stack-up Tool", layout="wide")
 # --- CSS 樣式：調整結果數值與標題字體 ---
 st.markdown("""
     <style>
-    /* 數值放大至 30px 且加粗 */
     [data-testid="stMetricValue"] {
         font-size: 30px !important;
         font-weight: bold !important;
         color: #1f77b4 !important;
     }
-    /* 標題文字放大 1.5 倍 (約 24px) */
     [data-testid="stMetricLabel"] {
         font-size: 24px !important;
         font-weight: bold !important;
     }
-    /* 縮小元件間距 */
     .element-container { margin-bottom: -10px !important; }
     .stImage { margin-bottom: -20px !important; }
     h3 { margin-top: -10px !important; padding-bottom: 10px !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- PDF 產生函數 (彙整至 A4) ---
-def create_pdf(proj, title, date, unit, target, wc, rss, yield_val, cpk, df):
+# --- PDF 產生函數 (模擬完整 App 畫面佈局) ---
+def create_full_report_pdf(proj, title, date, unit, target, wc, rss, yield_val, cpk, df, img_path=None):
     pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.add_page()
     
-    # 設定字體 (PDF 僅支援英文字元)
+    # 1. 頁面大標題
     pdf.set_font("Arial", 'B', 18)
-    pdf.cell(190, 15, txt="Tolerance Analysis Report", ln=True, align='C')
+    pdf.cell(190, 15, txt="Design Tolerance Stack-up Analysis Report", ln=True, align='C')
+    pdf.ln(2)
+
+    # 2. 專案基本資訊 (表格形式)
+    pdf.set_font("Arial", 'B', 10)
+    pdf.set_fill_color(230, 230, 230)
+    pdf.cell(45, 8, "Project Name", 1, 0, 'L', True)
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(50, 8, proj, 1)
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(45, 8, "Date", 1, 0, 'L', True)
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(50, 8, date, 1, 1)
+    
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(45, 8, "Analysis Title", 1, 0, 'L', True)
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(50, 8, title, 1)
+    pdf.set_font("Arial", 'B', 10)
+    pdf.cell(45, 8, "Unit", 1, 0, 'L', True)
+    pdf.set_font("Arial", '', 10)
+    pdf.cell(50, 8, unit, 1, 1)
     pdf.ln(5)
 
-    # 專案基本資訊區
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(95, 10, txt=f"Project: {proj}", border=1)
-    pdf.cell(95, 10, txt=f"Title: {title}", border=1, ln=True)
-    pdf.cell(95, 10, txt=f"Date: {date}", border=1)
-    pdf.cell(95, 10, txt=f"Unit: {unit}", border=1, ln=True)
-    pdf.ln(10)
+    # 3. 範例示意圖 (若檔案存在則嵌入)
+    if img_path and os.path.exists(img_path):
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(190, 8, "Example Diagram:", ln=True)
+        # 調整圖片大小以符合 A4 寬度，並保持比例
+        pdf.image(img_path, x=10, y=pdf.get_y(), w=140)
+        pdf.ln(70) # 預留圖片高度空間
 
-    # 分析結果 (重點區域)
-    pdf.set_font("Arial", 'B', 14)
+    # 4. 公差數據表格
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(190, 10, "Input Data Table:", ln=True)
+    pdf.set_font("Arial", 'B', 9)
     pdf.set_fill_color(240, 240, 240)
-    pdf.cell(190, 10, txt="Analysis Results", ln=True, fill=True)
-    pdf.set_font("Arial", '', 12)
-    pdf.cell(63, 10, txt=f"Worst Case: +/- {wc:.3f}", border=1)
-    pdf.cell(63, 10, txt=f"RSS Total: +/- {rss:.3f}", border=1)
-    pdf.cell(64, 10, txt=f"Target: +/- {target:.3f}", border=1, ln=True)
-    pdf.cell(95, 10, txt=f"Est. Yield: {yield_val:.2f} %", border=1)
-    pdf.cell(95, 10, txt=f"Est. CPK: {cpk:.2f}", border=1, ln=True)
-    pdf.ln(10)
+    pdf.cell(20, 7, "Part", 1, 0, 'C', True)
+    pdf.cell(10, 7, "No.", 1, 0, 'C', True)
+    pdf.cell(90, 7, "Description", 1, 0, 'C', True)
+    pdf.cell(35, 7, "Req. CPK", 1, 0, 'C', True)
+    pdf.cell(35, 7, "Tol (+/-)", 1, 1, 'C', True)
+    
+    pdf.set_font("Arial", '', 9)
+    for _, row in df.iterrows():
+        pdf.cell(20, 7, str(row['Part']), 1)
+        pdf.cell(10, 7, str(row['No.']), 1)
+        pdf.cell(90, 7, str(row['Description']), 1)
+        pdf.cell(35, 7, f"{row['Req. CPK']:.2f}", 1)
+        pdf.cell(35, 7, f"{row['Upper Tol']:.3f}", 1, 1)
+    pdf.ln(5)
 
-    # 數據明細
+    # 5. 分析結果 (大字體加強)
+    pdf.set_font("Arial", 'B', 14)
+    pdf.cell(190, 10, "Summary Results:", ln=True)
     pdf.set_font("Arial", 'B', 12)
-    pdf.cell(190, 10, txt="Input Data Table Detail", ln=True)
-    pdf.set_font("Arial", size=10)
-    # 表格標題
-    pdf.cell(30, 8, "Part", 1)
-    pdf.cell(20, 8, "No.", 1)
-    pdf.cell(100, 8, "Description", 1)
-    pdf.cell(40, 8, "Tol (+/-)", 1, ln=True)
-    # 表格內容
-    for index, row in df.iterrows():
-        pdf.cell(30, 8, str(row['Part']), 1)
-        pdf.cell(20, 8, str(row['No.']), 1)
-        pdf.cell(100, 8, str(row['Description']), 1)
-        pdf.cell(40, 8, f"{row['Upper Tol']:.3f}", 1, ln=True)
+    pdf.set_text_color(31, 119, 180) # 藍色字體
+    pdf.cell(63, 10, f"Worst Case: +/- {wc:.3f}", 1, 0, 'C')
+    pdf.cell(63, 10, f"RSS Total: +/- {rss:.3f}", 1, 0, 'C')
+    pdf.cell(64, 10, f"Yield: {yield_val:.2f} %", 1, 1, 'C')
+    
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Arial", 'I', 10)
+    pdf.ln(2)
+    pdf.multi_cell(190, 8, txt=f"Conclusion: Based on the target spec of +/- {target:.3f} mm, the estimated assembly yield is {yield_val:.2f}% with a CPK of {cpk:.2f}.", border=0)
 
-    pdf.ln(10)
+    # 頁尾
+    pdf.set_y(-20)
     pdf.set_font("Arial", 'I', 8)
-    pdf.cell(190, 10, txt=f"Generated by Tolerance Stack-up Tool - {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}", align='R')
+    pdf.cell(190, 10, txt=f"Report Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", align='R')
     
     return pdf.output(dest="S").encode("latin-1")
 
@@ -98,7 +124,7 @@ def clear_all():
 def reset_default():
     st.session_state.df_data = pd.DataFrame(DEFAULT_DATA)
 
-# --- 介面 ---
+# --- 介面佈局 ---
 st.markdown("<h2 style='text-align: center;'>設計累計公差分析</h2>", unsafe_allow_html=True)
 st.markdown("<h4 style='text-align: center;'>Design Tolerance Stack-up Analysis</h4>", unsafe_allow_html=True)
 
@@ -115,13 +141,11 @@ st.divider()
 
 # --- 範例圖片 ---
 st.subheader("範例示意圖 (Example Diagram)")
-try:
-    st.image("4125.jpg", caption="公差標註範例", use_container_width=True)
-except:
-    st.info("💡 提示：若要自動顯示範例圖，請確保 GitHub 內有 4125.jpg")
-    uploaded_image = st.file_uploader("或手動匯入圖片檔", type=["png", "jpg", "jpeg"], key="uploader")
-    if uploaded_image:
-        st.image(uploaded_image, use_container_width=True)
+img_filename = "4125.jpg"
+if os.path.exists(img_filename):
+    st.image(img_filename, caption="分析參考圖示", use_container_width=True)
+else:
+    st.info("💡 請確保 GitHub 內有 4125.jpg 以便在 PDF 報告中顯示圖片。")
 
 st.divider()
 
@@ -149,7 +173,7 @@ else:
 
 st.divider()
 
-# --- 結果顯示 (標題放大 1.5 倍，數字 30px) ---
+# --- 結果顯示 ---
 st.subheader("分析結果 (Results)")
 r1, r2, r3 = st.columns(3)
 r1.metric("Worst Case", f"± {wc:.3f} mm")
@@ -158,9 +182,15 @@ r3.metric("預估良率 (Yield)", f"{yield_val:.2f} %")
 
 st.info(f"結論：若採用 {target_spec:.3f} mm 為規格，預估良率為 {yield_val:.2f}%，CPK 為 {cpk:.2f}。")
 
-# PDF 匯出按鈕 (彙整 A4)
+# --- PDF 匯出 (全畫面整合版) ---
 try:
-    pdf_bytes = create_pdf(proj_name, title_text, date_text, unit_text, target_spec, wc, rss, yield_val, cpk, edited_df)
-    st.download_button("📥 匯出 A4 PDF 報告", data=pdf_bytes, file_name=f"Report_{proj_name}.pdf", mime="application/pdf")
+    pdf_bytes = create_full_report_pdf(proj_name, title_text, date_text, unit_text, target_spec, wc, rss, yield_val, cpk, edited_df, img_filename)
+    st.download_button(
+        label="📥 匯出完整 A4 PDF 報告",
+        data=pdf_bytes,
+        file_name=f"Tolerance_Full_Report_{proj_name}.pdf",
+        mime="application/pdf"
+    )
 except Exception as e:
-    st.warning("PDF 目前僅支援英文內容顯示。")
+    st.error(f"PDF 匯出失敗: {e}")
+    st.warning("請注意：PDF 目前僅支援英文與數字內容顯示。")
