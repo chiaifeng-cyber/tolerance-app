@@ -4,7 +4,7 @@ import numpy as np
 from scipy.stats import norm
 import os
 
-# 1. 頁面配置與 CSS
+# 1. 頁面配置與進階 CSS
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 st.markdown("""<style>
     .stApp { background-color: #f0f2f6; }
@@ -35,22 +35,23 @@ def get_init_df():
 if 'df_data' not in st.session_state:
     st.session_state.df_data = get_init_df()
     st.session_state.target_val = 0.2
-    st.session_state.results = {"wc": "± 0.475", "rss": "± 0.241", "cpk": "0.83", "yld": "98.72 %"}
-    st.session_state.show_img, st.session_state.is_cleared = True, False
+    st.session_state.show_img = True
+    st.session_state.is_reset_img = False
 
 def action(mode):
     if mode == "clear":
-        # 💡 修復：清空時數值欄位使用 None 而非空字串，避免與 NumberColumn 衝突
         st.session_state.df_data = pd.DataFrame([
             {COLS[0]: "", COLS[1]: "", COLS[2]: "", COLS[3]: "", COLS[4]: None} for _ in range(6)
         ])
-        st.session_state.target_val, st.session_state.results = 0.0, {"wc":"", "rss":"", "cpk":"", "yld":""}
-        st.session_state.show_img, st.session_state.is_cleared = False, True
+        st.session_state.target_val = 0.0
+        st.session_state.show_img = False
         if os.path.exists("temp.png"): os.remove("temp.png")
     elif mode == "reset":
-        st.session_state.df_data, st.session_state.target_val = get_init_df(), 0.2
-        st.session_state.results = {"wc": "± 0.475", "rss": "± 0.241", "cpk": "0.83", "yld": "98.72 %"}
-        st.session_state.show_img, st.session_state.is_cleared = False, False
+        # 💡 重置時恢復數據並確保圖片路徑指向預設 4125.jpg
+        st.session_state.df_data = get_init_df()
+        st.session_state.target_val = 0.2
+        st.session_state.show_img = True
+        if os.path.exists("temp.png"): os.remove("temp.png")
     st.rerun()
 
 # 3. 主介面
@@ -63,11 +64,13 @@ with l:
     if up:
         with open("temp.png", "wb") as f: f.write(up.getbuffer())
         st.session_state.show_img = True
+    
+    # 💡 圖片優先順序：上傳圖 > 預設圖
     if st.session_state.show_img:
         current_img = "temp.png" if os.path.exists("temp.png") else ("4125.jpg" if os.path.exists("4125.jpg") else None)
         if current_img: st.image(current_img, use_container_width=True)
 
-    # 💡 數據編輯器：修正 column_config 類型匹配問題
+    # 💡 數據編輯器
     ed_df = st.data_editor(
         st.session_state.df_data, 
         num_rows="dynamic", 
@@ -81,51 +84,46 @@ with l:
         }
     )
     st.session_state.df_data = ed_df
-    
-    # 即時計算 Worst Case
-    current_tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
-    real_wc = current_tols.sum()
-    if not st.session_state.is_cleared:
-        st.session_state.results["wc"] = f"± {real_wc:.3f}"
 
-    bc1, bc2, bc3 = st.columns(3)
+    # 💡 及時連動計算邏輯
+    tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
+    wc_v = tols.sum()
+    rss_v = np.sqrt((tols**2).sum())
+
+    bc1, bc2 = st.columns(2)
     bc1.button("🗑️ Clear / 全部清除", on_click=action, args=("clear",), use_container_width=True)
-    
-    if bc2.button("🔄 Recalculate / 重新計算", use_container_width=True):
-        rss_v = np.sqrt((current_tols**2).sum())
-        ts_v = st.session_state.target_val
-        cpk_v = ts_v / rss_v if rss_v != 0 else 0
-        st.session_state.results = {
-            "wc": f"± {real_wc:.3f}", "rss": f"± {rss_v:.3f}", 
-            "cpk": f"{cpk_v:.2f}", "yld": f"{(2 * norm.cdf(3 * cpk_v) - 1) * 100:.2f} %"
-        }
-        st.session_state.is_cleared = False
-        st.rerun()
-    bc3.button("⏪ Reset / 還原範例", on_click=action, args=("reset",), use_container_width=True)
+    bc2.button("⏪ Reset / 還原範例", on_click=action, args=("reset",), use_container_width=True)
 
 with r:
     st.markdown('<p class="section-label">📋 Project information / 專案資訊</p>', unsafe_allow_html=True)
     with st.container(border=True):
-        st.session_state.proj_name = st.text_input("Project Name", value="TM-P4125-001" if not st.session_state.is_cleared else "")
-        st.session_state.analysis_title = st.text_input("Analysis Title", value="Connector Analysis" if not st.session_state.is_cleared else "")
+        pn = st.text_input("Project Name", value="TM-P4125-001" if st.session_state.show_img else "")
+        at = st.text_input("Analysis Title", value="Connector Analysis" if st.session_state.show_img else "")
         c1, c2 = st.columns(2)
-        st.session_state.date = c1.text_input("Date", value="2025/12/30" if not st.session_state.is_cleared else "")
-        st.session_state.unit = c2.text_input("Unit", value="mm" if not st.session_state.is_cleared else "")
+        dt = c1.text_input("Date", value="2025/12/30" if st.session_state.show_img else "")
+        ut = c2.text_input("Unit", value="mm" if st.session_state.show_img else "")
     
-    st.session_state.target_val = st.number_input(
-        "Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f", 
-        on_change=lambda: st.session_state.results.update({"rss":"","cpk":"","yld":""})
-    )
+    ts = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f")
+    st.session_state.target_val = ts
 
-    res = st.session_state.results
+    # 💡 計算 CPK 與 良率
+    cpk_v = ts / rss_v if rss_v > 0 else 0
+    yld_v = (2 * norm.cdf(3 * cpk_v) - 1) * 100 if rss_v > 0 else 0
+
+    # 顯示結果
     res1, res2 = st.columns(2)
-    res1.metric("Worst Case", res["wc"])
-    res2.metric("RSS Total", res["rss"])
-    res1.metric("Est. CPK", res["cpk"])
-    res2.metric("Est. Yield", res["yld"])
+    res1.metric("Worst Case", f"± {wc_v:.3f}" if wc_v > 0 else "")
+    res2.metric("RSS Total", f"± {rss_v:.3f}" if rss_v > 0 else "")
+    res1.metric("Est. CPK", f"{cpk_v:.2f}" if rss_v > 0 else "")
+    res2.metric("Est. Yield", f"{yld_v:.2f} %" if rss_v > 0 else "")
 
     
 
     st.divider()
-    con_auto = f"1. Target +/-{st.session_state.target_val:.3f}, CPK {res['cpk']}, Yield {res['yld']}.\n2. In RSS calculation, all tolerances must be controlled with CPK ≥ 1.0.\n3. \n4. "
-    st.text_area("✍️ Conclusion 結論", value=con_auto if not st.session_state.is_cleared else "", height=130)
+    con_auto = (
+        f"1. Target +/-{ts:.3f}, CPK {cpk_v:.2f}, Yield {yld_v:.2f}%.\n"
+        f"2. In RSS calculation, all tolerances must be controlled with CPK ≥ 1.0.\n"
+        f"3. \n"
+        f"4. "
+    )
+    st.text_area("✍️ Conclusion 結論", value=con_auto if wc_v > 0 else "", height=130)
