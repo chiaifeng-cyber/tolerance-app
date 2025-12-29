@@ -8,17 +8,18 @@ import os
 # 1. 頁面配置 (Page Config)
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 
-# 2. CSS：修正標題、放大字體、優化結論底線間距、隱藏索引
+# 2. CSS 樣式：優化 16:9 佈局、字體放大、結論區底線拉開距離
 st.markdown("""
     <style>
+    /* 修正頂部邊距確保標題不切頂 */
     .block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; }
-    h2 { line-height: 1.6 !important; font-size: 26px !important; text-align: center; margin-bottom: 10px !important; }
     
-    /* 結果數值與標籤放大 (Metrics Scaling) */
+    /* 標題與標籤雙語字體放大 */
+    h2 { line-height: 1.6 !important; font-size: 26px !important; text-align: center; margin-bottom: 10px !important; }
     [data-testid="stMetricLabel"] { font-size: 20px !important; font-weight: bold !important; color: #333 !important; }
     [data-testid="stMetricValue"] { font-size: 30px !important; font-weight: bold !important; color: #1f77b4 !important; }
     
-    /* 結論區底線間距優化 (Conclusion spacing) */
+    /* 結論區底線間距優化：拉開文字與線的距離 */
     .stTextArea textarea {
         background-attachment: local;
         background-image: linear-gradient(to right, white 0px, transparent 0px), 
@@ -30,16 +31,16 @@ st.markdown("""
         padding-top: 8px !important;
     }
 
-    /* 確保 16:9 佈局 (16:9 optimization) */
+    /* 隱藏表格工具列與功能選單，保持純淨 */
+    [data-testid="stElementToolbar"] { display: none !important; }
+    
+    /* 壓縮間距符合 16:9 一畫面全覽 */
     div[data-testid="stDataEditor"] > div { max-height: 280px !important; }
     .element-container { margin-bottom: -5px !important; }
-    
-    /* 隱藏表格內建的下載/搜尋工具列以保持純淨 */
-    [data-testid="stElementToolbar"] { display: none !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. PDF 產生函數 (純英文報告 / English Report)
+# 3. PDF 產生函數 (純英文報告輸出)
 def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, img):
     pdf = FPDF()
     pdf.add_page()
@@ -50,10 +51,16 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
     data_map = {"Project": proj, "Title": title, "Date": date, "Unit": unit, "Target": f"+/- {target:.3f}"}
     for k, v in data_map.items():
         pdf.cell(45, 7, f"{k}:", 1); pdf.cell(145, 7, str(v), 1, 1)
-    if img: pdf.image(img, x=10, w=100); pdf.ln(60)
+    if img:
+        # 嵌入示意圖
+        pdf.ln(5)
+        pdf.image(img, x=10, w=100)
+        pdf.ln(60)
     pdf.set_font("Arial", 'B', 12)
+    pdf.ln(5)
     pdf.cell(190, 10, f"Results: WC={wc:.3f}, RSS={rss:.3f}, CPK={cpk:.2f}, Yield={yld:.2f}%", ln=True)
-    pdf.set_font("Arial", 'I', 10); pdf.multi_cell(190, 6, txt=f"Conclusion: {concl}")
+    pdf.set_font("Arial", 'I', 10)
+    pdf.multi_cell(190, 6, txt=f"Conclusion: {concl}")
     return pdf.output(dest="S").encode("latin-1")
 
 # 4. 初始化與清除邏輯 (State Management)
@@ -65,7 +72,7 @@ DEFAULT_DATA = [
     {COLS[0]: "Connector", COLS[1]: 1.33, COLS[2]: "d", COLS[3]: "Connector housing", COLS[4]: 0.125}
 ]
 
-# 初始化各項 Session State
+# 初始化 Session State
 for key, val in {"df_data": pd.DataFrame(DEFAULT_DATA), "target_val": 0.2, "proj_name": "TM-P4125-001", 
                  "analysis_title": "Connector Analysis", "date": "2025/12/29", "unit": "mm", 
                  "show_img": True, "concl_text": ""}.items():
@@ -84,21 +91,23 @@ def action_all(mode):
 
 # 5. 主介面繪製
 st.markdown("<h2>設計累計公差分析工具 / Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=True)
+
 l_col, r_col = st.columns([1.3, 1])
 
 with l_col:
     st.subheader("🖼️ Diagram & Input / 示意圖與數據輸入")
     img_pdf = "4125.jpg" if st.session_state.show_img and os.path.exists("4125.jpg") else None
-    if img_pdf: st.image(img_pdf, use_container_width=True)
+    if img_pdf:
+        st.image(img_pdf, use_container_width=True)
     else: 
+        # 清除後自動切換至上傳模式
         up = st.file_uploader("Upload New Diagram / 上傳新示意圖", type=["jpg", "png"])
         if up: 
             st.image(up, use_container_width=True)
             with open("temp.png", "wb") as f: f.write(up.getbuffer())
             img_pdf = "temp.png"
 
-    # 數據表格 (Data Editor)
-    # 設置 hide_index=False 以顯示左側勾選框，方便點選並按垃圾桶/Delete刪除
+    # 數據表格：顯示索引(勾選框)以便進行列刪除
     ed_df = st.data_editor(
         st.session_state.df_data, 
         num_rows="dynamic", 
@@ -106,6 +115,9 @@ with l_col:
         hide_index=False
     )
     st.session_state.df_data = ed_df
+    
+    # 加入刪除引導說明 (雙語 Caption)
+    st.caption("💡 點擊左側序號選取該列，按 Delete 鍵即可刪除。 / Click the index on the left and press Delete to remove the row.")
     
     bc1, bc2 = st.columns(2)
     bc1.button("🗑️ Clear All / 全部清除", on_click=action_all, args=("clear",), use_container_width=True)
@@ -122,25 +134,27 @@ with r_col:
     t_s = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f", key="target_input")
     st.session_state.target_val = t_s
     
-    # 計算 (Calculation)
+    # 計算邏輯 (Calculation)
     wc = ed_df[COLS[4]].sum() if not ed_df.empty else 0
     rss = np.sqrt((ed_df[COLS[4]]**2).sum()) if not ed_df.empty else 0
     cpk = t_s / rss if rss != 0 else 0
     yld = (2 * norm.cdf(3 * cpk) - 1) * 100
     
-    res = st.columns(2)
-    res[0].metric("Worst Case (最壞情況)", f"± {wc:.3f}")
-    res[1].metric("RSS Total (均方根)", f"± {rss:.3f}")
-    res[0].metric("Est. CPK (預估 CPK)", f"{cpk:.2f}")
-    res[1].metric("Est. Yield (預估良率)", f"{yld:.2f} %")
+    # 分析結果：使用 st.metric 呈現
+    res_c1, res_c2 = st.columns(2)
+    res_c1.metric("Worst Case (最壞情況)", f"± {wc:.3f}")
+    res_c2.metric("RSS Total (均方根)", f"± {rss:.3f}")
+    res_c1.metric("Est. CPK (預估 CPK)", f"{cpk:.2f}")
+    res_c2.metric("Est. Yield (預估良率)", f"{yld:.2f} %")
 
     st.divider()
-    con_def = f"Target +/-{t_s:.3f}, CPK {cpk:.2f}, Yield {yld:.2f}%."
+    # 結論區：可自定義內容，並具備 5 行高度底線
+    con_def = f"Conclusion: Target +/-{t_s:.3f}, CPK {cpk:.2f}, Yield {yld:.2f}%."
     con_in = st.text_area("Conclusion 結論 (Editable)", value=st.session_state.concl_text or con_def, height=180)
     st.session_state.concl_text = con_in
 
+    # PDF 匯出按鈕
     try:
         pdf_b = create_pdf(p_n, a_t, d_t, u_t, t_s, wc, rss, cpk, yld, con_in, ed_df, img_pdf)
         st.download_button("📥 Export PDF Report / 匯出報告", data=pdf_b, file_name=f"Report_{p_n}.pdf", use_container_width=True)
     except: st.error("PDF Exporting Error...")
-
