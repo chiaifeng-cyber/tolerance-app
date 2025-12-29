@@ -5,43 +5,54 @@ from scipy.stats import norm
 from fpdf import FPDF
 import os
 
-# 1. 頁面配置與進階 CSS 樣式
+# 1. 頁面配置與進階 CSS 樣式 (優化視窗大小與字體)
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 st.markdown("""<style>
     .stApp { background-color: #f0f2f6; }
-    .main .block-container { padding-top: 3rem !important; }
-    h2 { line-height: 1.2; font-size: 24px; text-align: center; margin-top: -1.5rem; color: #333; }
+    /* 縮小頂部邊距以符合 Window 介面全覽 */
+    .main .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; }
     
-    /* 區域標籤樣式與粗體化 */
-    .section-label, [data-testid="stMetricLabel"], .stTextArea label p, .stTextInput label p { 
-        font-size: 19px !important; font-weight: bold !important; color: #333; 
+    h2 { line-height: 1.1; font-size: 22px; text-align: center; margin-top: -1rem; margin-bottom: 10px; color: #333; }
+    
+    /* 區域標籤樣式 (縮小至 18px) */
+    .section-label, [data-testid="stMetricLabel"], .stTextArea label p { 
+        font-size: 18px !important; font-weight: bold !important; color: #333; 
     }
     
-    /* Target Spec 標籤設定為粗體字 */
-    [data-testid="stNumberInput"] label p { font-size: 18px !important; font-weight: bold !important; color: #000 !important; }
+    /* 1. Project Name 等資訊標籤設定為「非粗體」 */
+    .stTextInput label p { font-weight: normal !important; font-size: 14px !important; }
     
-    /* 圓角反白輸入框 */
+    /* Target Spec 標籤保持粗體但縮小 */
+    [data-testid="stNumberInput"] label p { font-size: 16px !important; font-weight: bold !important; color: #000 !important; }
+    
+    /* 圓角反白輸入框與數據編輯器高度壓縮 */
     div[data-testid="stTextInput"] input, 
     div[data-testid="stNumberInput"] input,
     div[data-testid="stTextArea"] textarea {
         background-color: #ffffff !important;
-        border-radius: 10px !important;
-        border: 1px solid #d1d5db !important;
-        padding: 10px !important;
+        border-radius: 8px !important;
+        padding: 5px !important;
     }
-    div[data-testid="stDataEditor"] { background-color: #ffffff !important; border-radius: 10px !important; padding: 5px; }
-    [data-testid="stMetricValue"] { font-size: 26px !important; font-weight: bold; color: #1f77b4 !important; }
+    div[data-testid="stDataEditor"] { background-color: #ffffff !important; border-radius: 8px !important; }
+    
+    /* Metric 數值大小縮小以節省空間 */
+    [data-testid="stMetricValue"] { font-size: 22px !important; font-weight: bold; color: #1f77b4 !important; }
     [data-testid="stElementToolbar"] { display: none !important; }
 </style>""", unsafe_allow_html=True)
 
-# 2. PDF 產生函數
+# 2. PDF 產生函數 (強化對圖片路徑的檢查避免報錯)
 def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, img):
     pdf = FPDF(); pdf.add_page()
     pdf.set_font("Arial", 'B', 16); pdf.cell(190, 10, "Tolerance Stack-up Analysis Report", ln=True, align='C'); pdf.ln(5)
     pdf.set_font("Arial", 'B', 10); pdf.set_fill_color(240, 240, 240)
     for l, v in [("Project:", proj), ("Title:", title), ("Date:", date), ("Unit:", unit), ("Target Spec:", f"+/- {target:.3f}")]:
-        pdf.cell(40, 7, l, 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(145 if "Title" in l else 50, 7, str(v), 1, 1 if "Title" in l or "Unit" in l else 0)
-    if img and os.path.exists(img): pdf.ln(5); pdf.image(img, x=10, w=100); pdf.ln(5)
+        pdf.cell(40, 7, l, 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(150 if "Title" in l else 55, 7, str(v), 1, 1 if "Title" in l or "Unit" in l else 0)
+    
+    # 💡 檢查圖片路徑是否存在，避免引發紅字 Runtime錯誤
+    if img and isinstance(img, str) and os.path.exists(img):
+        try: pdf.ln(5); pdf.image(img, x=10, w=100); pdf.ln(5)
+        except: pass
+        
     pdf.ln(2); pdf.set_font("Arial", 'B', 11); pdf.cell(190, 8, "Input Data Details:", ln=True)
     pdf.set_font("Arial", 'B', 9); pdf.set_fill_color(230, 230, 230)
     for h, w in [("Part", 30), ("No.", 20), ("Description", 100), ("Tol (+/-)", 40)]: pdf.cell(w, 7, h, 1, 0, 'C', True)
@@ -66,40 +77,27 @@ def get_init_df():
         {COLS[0]: "Connector", COLS[1]: 1.33, COLS[2]: "d", COLS[3]: "Connector housing", COLS[4]: 0.125}
     ])
 
-# Session State 管理，加入專案資訊變數
 if 'df_data' not in st.session_state:
     st.session_state.df_data = get_init_df()
-    st.session_state.proj_name = "TM-P4125-001"
-    st.session_state.analysis_title = "Connector Analysis"
-    st.session_state.date = "2025/12/30"
-    st.session_state.unit = "mm"
+    st.session_state.proj_name, st.session_state.analysis_title = "TM-P4125-001", "Connector Analysis"
+    st.session_state.date, st.session_state.unit = "2025/12/30", "mm"
     st.session_state.target_val = 0.2
     st.session_state.results = {"wc": "± 0.475", "rss": "± 0.241", "cpk": "0.83", "yld": "98.72 %"}
-    st.session_state.show_img = True
-    st.session_state.is_cleared = False
+    st.session_state.show_img, st.session_state.is_cleared = True, False
 
 def action(mode):
     if mode == "clear":
         st.session_state.df_data = pd.DataFrame([{c: "" for c in COLS} for _ in range(6)])
-        st.session_state.proj_name = ""
-        st.session_state.analysis_title = ""
-        st.session_state.date = ""
-        st.session_state.unit = ""
-        st.session_state.target_val = 0.0
-        st.session_state.results = {"wc": "", "rss": "", "cpk": "", "yld": ""}
+        st.session_state.proj_name, st.session_state.analysis_title, st.session_state.date, st.session_state.unit = "", "", "", ""
+        st.session_state.target_val, st.session_state.results = 0.0, {"wc": "", "rss": "", "cpk": "", "yld": ""}
         st.session_state.show_img = False
         if os.path.exists("temp.png"): os.remove("temp.png")
         st.session_state.is_cleared = True
     elif mode == "reset":
         st.session_state.df_data = get_init_df()
-        st.session_state.proj_name = "TM-P4125-001"
-        st.session_state.analysis_title = "Connector Analysis"
-        st.session_state.date = "2025/12/30"
-        st.session_state.unit = "mm"
-        st.session_state.target_val = 0.2
-        st.session_state.results = {"wc": "± 0.475", "rss": "± 0.241", "cpk": "0.83", "yld": "98.72 %"}
-        st.session_state.show_img = True
-        st.session_state.is_cleared = False
+        st.session_state.proj_name, st.session_state.analysis_title, st.session_state.date, st.session_state.unit = "TM-P4125-001", "Connector Analysis", "2025/12/30", "mm"
+        st.session_state.target_val, st.session_state.results = 0.2, {"wc": "± 0.475", "rss": "± 0.241", "cpk": "0.83", "yld": "98.72 %"}
+        st.session_state.show_img, st.session_state.is_cleared = True, False
     st.rerun()
 
 # 4. 主介面
@@ -116,43 +114,34 @@ with l:
     
     if st.session_state.show_img:
         current_img = "temp.png" if os.path.exists("temp.png") else ("4125.jpg" if os.path.exists("4125.jpg") else None)
-        if current_img:
-            st.image(current_img, use_container_width=True)
+        if current_img: st.image(current_img, use_container_width=True)
 
     ed_df = st.data_editor(st.session_state.df_data, num_rows="dynamic", use_container_width=True)
     st.session_state.df_data = ed_df
     
     bc1, bc2, bc3 = st.columns(3)
     bc1.button("🗑️ Clear / 全部清除", on_click=action, args=("clear",), use_container_width=True)
-    
     if bc2.button("🔄 Recalculate / 重新計算", use_container_width=True):
         tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
         wc_v, rss_v = tols.sum(), np.sqrt((tols**2).sum())
         ts_v = st.session_state.target_val
         cpk_v = ts_v / rss_v if rss_v != 0 else 0
-        st.session_state.results = {
-            "wc": f"± {wc_v:.3f}", "rss": f"± {rss_v:.3f}",
-            "cpk": f"{cpk_v:.2f}", "yld": f"{(2 * norm.cdf(3 * cpk_v) - 1) * 100:.2f} %"
-        }
+        st.session_state.results = {"wc": f"± {wc_v:.3f}", "rss": f"± {rss_v:.3f}", "cpk": f"{cpk_v:.2f}", "yld": f"{(2 * norm.cdf(3 * cpk_v) - 1) * 100:.2f} %"}
         st.session_state.is_cleared = False
         st.rerun()
     bc3.button("⏪ Reset / 還原範例", on_click=action, args=("reset",), use_container_width=True)
 
 with r:
-    # 變更後的標題
     st.markdown('<p class="section-label">📋 Project information / 專案資訊</p>', unsafe_allow_html=True)
     with st.container(border=True):
-        pn = st.text_input("Project Name", value=st.session_state.proj_name, key="pn_input")
-        at = st.text_input("Analysis Title", value=st.session_state.analysis_title, key="at_input")
+        # 💡 使用 session_state 綁定，確保清除動作能即時反映在畫面上
+        st.session_state.proj_name = st.text_input("Project Name", value=st.session_state.proj_name)
+        st.session_state.analysis_title = st.text_input("Analysis Title", value=st.session_state.analysis_title)
         c1, c2 = st.columns(2)
-        dt = c1.text_input("Date", value=st.session_state.date, key="dt_input")
-        ut = c2.text_input("Unit", value=st.session_state.unit, key="ut_input")
-        # 同步回 session_state
-        st.session_state.proj_name, st.session_state.analysis_title = pn, at
-        st.session_state.date, st.session_state.unit = dt, ut
+        st.session_state.date = c1.text_input("Date", value=st.session_state.date)
+        st.session_state.unit = c2.text_input("Unit", value=st.session_state.unit)
     
-    ts = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f")
-    st.session_state.target_val = ts
+    st.session_state.target_val = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f")
 
     res1, res2 = st.columns(2)
     res1.metric("Worst Case", st.session_state.results["wc"])
@@ -160,10 +149,11 @@ with r:
     res1.metric("Est. CPK", st.session_state.results["cpk"])
     res2.metric("Est. Yield", st.session_state.results["yld"])
 
+    
     st.divider()
-    con_auto = f"1. Target +/-{ts:.3f}, CPK {st.session_state.results['cpk']}, Yield {st.session_state.results['yld']}."
-    con_in = st.text_area("✍️ Conclusion 結論", value=con_auto if not st.session_state.is_cleared else "", height=120)
+    con_auto = f"1. Target +/-{st.session_state.target_val:.3f}, CPK {st.session_state.results['cpk']}, Yield {st.session_state.results['yld']}."
+    con_in = st.text_area("✍️ Conclusion 結論", value=con_auto if not st.session_state.is_cleared else "", height=100)
     
     res = st.session_state.results
-    pdf_b = create_pdf(pn, at, dt, ut, ts, res["wc"], res["rss"], res["cpk"], res["yld"], con_in, ed_df, current_img if st.session_state.show_img else None)
-    st.download_button("📥 Export PDF Report", data=pdf_b, file_name=f"Report_{pn}.pdf", use_container_width=True)
+    pdf_b = create_pdf(st.session_state.proj_name, st.session_state.analysis_title, st.session_state.date, st.session_state.unit, st.session_state.target_val, res["wc"], res["rss"], res["cpk"], res["yld"], con_in, ed_df, current_img if st.session_state.show_img else None)
+    st.download_button("📥 Export PDF Report", data=pdf_b, file_name=f"Report_{st.session_state.proj_name}.pdf", use_container_width=True)
