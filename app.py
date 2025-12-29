@@ -41,13 +41,15 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
     pdf.set_font("Arial", 'I', 10); pdf.multi_cell(190, 6, concl)
     return pdf.output(dest="S").encode("latin-1")
 
-# 3. 初始化數據與邏輯
+# 3. 初始化數據與邏輯 (修正語法錯誤)
 COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差(±)"]
 DEFAULTS = {
-    "df_data": pd.DataFrame([{"Part 零件": "PCB", "Req. CPK 要求": 1.33, "No. 編號": "a", "Description 描述": "Panel mark to unit mark", "Tol. 公差(±)": 0.1},
-                             {"Part 零件": "PCB", "Req. CPK 要求": 1.33, "No. 編號": "b", "Description 描述": "Unit mark to soldering pad", "Tol. 公差(±)": 0.10}]),
-                             {"Part 零件": "SMT", "Req. CPK 要求": 1.0, "No. 編號": "c", "Description 描述": "Assy Process", "Tol. 公差(±)": 0.15}]),  
-                             {"Part 零件": "Connector", "Req. CPK 要求": 1.0, "No. 編號": "d", "Description 描述": "Connector housing (0.25/2)", "Tol. 公差(±)": 0.125}]), 
+    "df_data": pd.DataFrame([
+        {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "a", COLS[3]: "Panel mark to unit mark", COLS[4]: 0.1},
+        {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "b", COLS[3]: "Unit mark to soldering pad", COLS[4]: 0.1},
+        {COLS[0]: "SMT", COLS[1]: 1.0, COLS[2]: "c", COLS[3]: "Assy Process", COLS[4]: 0.15},
+        {COLS[0]: "Connector", COLS[1]: 1.0, COLS[2]: "d", COLS[3]: "Connector housing (0.25/2)", COLS[4]: 0.125}
+    ]),
     "target_val": 0.2, "proj_name": "TM-P4125-001", "analysis_title": "Connector Analysis", "date": "2025/12/29", "unit": "mm", "show_img": True, "concl_text": ""
 }
 
@@ -101,7 +103,6 @@ with r:
     res1.metric("Est. CPK", f"{cpk:.2f}"); res2.metric("Est. Yield", f"{yld:.2f} %")
 
     
-
     st.divider()
     auto_con = f"1. Target +/-{ts:.3f}, CPK {cpk:.2f}, Yield {yld:.2f}%.\n2. \n3. "
     con_in = st.text_area("✍️ Conclusion 結論", value=st.session_state.concl_text or auto_con, height=160, key="concl_area")
@@ -110,4 +111,3 @@ with r:
         pdf_b = create_pdf(pn, at, dt, ut, ts, wc, rss, cpk, yld, con_in, ed_df, img)
         st.download_button("📥 Export PDF Report", data=pdf_b, file_name=f"Report_{pn}.pdf", use_container_width=True)
     except: st.error("PDF Error")
-
