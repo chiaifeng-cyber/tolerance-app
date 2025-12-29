@@ -6,15 +6,24 @@ from fpdf import FPDF
 import datetime
 import os
 
-# 設定頁面為寬螢幕模式，並自訂標題
+# 設定頁面為寬螢幕模式
 st.set_page_config(page_title="Tolerance Stack-up Tool", layout="wide")
 
-# --- CSS 樣式優化：16:9 一覽式佈局與字體 ---
+# --- CSS 樣式優化：修正標題切頂問題與佈局 ---
 st.markdown("""
     <style>
-    /* 移除頂部空白 */
-    .block-container { padding-top: 1.5rem; padding-bottom: 0rem; }
+    /* 修正頂部空白，確保標題不被切掉 */
+    .block-container { 
+        padding-top: 3rem !important; 
+        padding-bottom: 0rem !important; 
+    }
     
+    /* 標題行高修正 */
+    h2 {
+        line-height: 1.5 !important;
+        margin-bottom: 10px !important;
+    }
+
     /* 結果數值：30px 加粗藍色 */
     [data-testid="stMetricValue"] {
         font-size: 30px !important;
@@ -29,14 +38,13 @@ st.markdown("""
         color: #333333 !important;
     }
     
-    /* 壓縮元件間距，確保一畫面看全 */
+    /* 壓縮元件間距 */
     .element-container { margin-bottom: -5px !important; }
     .stImage { margin-bottom: -10px !important; }
-    hr { margin: 1em 0 !important; }
     
-    /* 調整資料編輯器高度 */
+    /* 限制資料編輯器高度以符合 16:9 */
     div[data-testid="stDataEditor"] > div {
-        max-height: 350px !important;
+        max-height: 320px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -47,12 +55,14 @@ def create_full_report_pdf(proj, title, date, unit, target, wc, rss, yield_val, 
     pdf.add_page()
     pdf.set_font("Arial", 'B', 18)
     pdf.cell(190, 15, txt="Design Tolerance Analysis Report", ln=True, align='C')
+    pdf.ln(5)
     pdf.set_font("Arial", 'B', 10)
     pdf.set_fill_color(230, 230, 230)
     pdf.cell(45, 8, "Project", 1, 0, 'L', True); pdf.cell(145, 8, proj, 1, 1)
     pdf.cell(45, 8, "Title", 1, 0, 'L', True); pdf.cell(145, 8, title, 1, 1)
     pdf.ln(5)
     if img_path and os.path.exists(img_path):
+        # 確保圖片在 PDF 中正確顯示
         pdf.image(img_path, x=10, w=140)
         pdf.ln(75)
     pdf.set_font("Arial", 'B', 12)
@@ -67,27 +77,29 @@ DEFAULT_DATA = [
     {"Part": "SMT", "No.": "c", "Description": "SMT tolerance", "Upper Tol": 0.150},
     {"Part": "Connector", "No.": "d", "Description": "Connector housing", "Upper Tol": 0.125},
 ]
+
 if 'df_data' not in st.session_state:
     st.session_state.df_data = pd.DataFrame(DEFAULT_DATA)
 
-def clear_all(): st.session_state.df_data = pd.DataFrame(columns=["Part", "No.", "Description", "Upper Tol"])
-def reset_default(): st.session_state.df_data = pd.DataFrame(DEFAULT_DATA)
+def clear_all(): 
+    st.session_state.df_data = pd.DataFrame(columns=["Part", "No.", "Description", "Upper Tol"])
+
+def reset_default(): 
+    st.session_state.df_data = pd.DataFrame(DEFAULT_DATA)
 
 # --- 主介面佈局 (左右分欄) ---
-st.markdown("<h2 style='text-align: center; margin-bottom: 0px;'>設計累計公差分析工具</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center;'>設計累計公差分析工具</h2>", unsafe_allow_html=True)
 
-left_col, right_col = st.columns([1.2, 1]) # 左側略寬於右側
+left_col, right_col = st.columns([1.2, 1])
 
 with left_col:
     st.subheader("🖼️ 範例示意與數據輸入")
-    # 示意圖區域
     img_filename = "4125.jpg"
     if os.path.exists(img_filename):
         st.image(img_filename, use_container_width=True)
     else:
-        st.info("請上傳 4125.jpg 至 GitHub 以顯示範例圖。")
+        st.info("請將範例圖 4125.jpg 上傳至 GitHub 儲存庫。")
     
-    # 數據編輯器
     c1, c2, _ = st.columns([1, 1, 2])
     with c1: st.button("🗑️ 清除資料", on_click=clear_all, use_container_width=True)
     with c2: st.button("🔄 還原範例", on_click=reset_default, use_container_width=True)
@@ -106,26 +118,17 @@ with right_col:
 
     st.divider()
     
-    # 計算邏輯
     target_spec = st.number_input("設計公差目標 (Target Spec ±)", value=0.200, format="%.3f")
+    
     if not edited_df.empty and "Upper Tol" in edited_df.columns:
         wc = edited_df["Upper Tol"].sum()
         rss = np.sqrt((edited_df["Upper Tol"]**2).sum())
         cpk = target_spec / rss if rss != 0 else 0
-        yield_val = (2 * norm.cdf(3 * cpk) - 1) * 100
+        z_score = 3 * cpk
+        yield_val = (2 * norm.cdf(z_score) - 1) * 100
     else:
         wc, rss, cpk, yield_val = 0, 0, 0, 0
 
-    # 分析結果區 (字體已按要求放大)
     st.metric("Worst Case (最壞情況)", f"± {wc:.3f} {unit_text}")
     st.metric("RSS Total (均方根)", f"± {rss:.3f} {unit_text}")
-    st.metric("預估良率 (Estimated Yield)", f"{yield_val:.2f} %")
-    
-    st.info(f"結論：CPK 為 {cpk:.2f}。")
-
-    # PDF 下載
-    try:
-        pdf_bytes = create_full_report_pdf(proj_name, title_text, date_text, unit_text, target_spec, wc, rss, yield_val, cpk, edited_df, img_filename)
-        st.download_button("📥 匯出 A4 PDF 報告", data=pdf_bytes, file_name=f"Report_{proj_name}.pdf", use_container_width=True)
-    except:
-        st.warning("PDF 匯出失敗 (僅支援英文字元)")
+    st.metric("預估良率 (Estimated Yield)", f"{
