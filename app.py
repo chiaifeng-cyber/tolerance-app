@@ -3,42 +3,39 @@ import pandas as pd
 import numpy as np
 from scipy.stats import norm
 from fpdf import FPDF
-import base64
 
-# 設定頁面資訊
+# 設定頁面
 st.set_page_config(page_title="Tolerance Stack-up Tool", layout="wide")
 
-# --- CSS 優化間距 ---
+# --- CSS 強力壓縮間距 ---
 st.markdown("""
     <style>
-    .element-container { margin-bottom: -10px; }
-    .stImage { margin-bottom: -20px; }
-    h3 { margin-top: -20px; padding-bottom: 10px; }
+    .element-container { margin-bottom: -15px !important; }
+    .stImage { margin-bottom: -40px !important; }
+    h3 { margin-top: -20px !important; padding-bottom: 5px !important; }
+    div[data-testid="stVerticalBlock"] > div { gap: 0.5rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- PDF 產生函數 ---
-def create_pdf(proj_name, title, target, wc, rss, yield_pct, cpk, df):
+# --- PDF 產生函數 (支援 Unicode 字元處理) ---
+def create_pdf(proj, title, target, wc, rss, yield_val, cpk):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
-    pdf.cell(200, 10, txt="Tolerance Stack-up Analysis Report", ln=True, align='C')
+    pdf.cell(200, 10, txt="Tolerance Analysis Report", ln=True, align='C')
     pdf.set_font("Arial", size=12)
     pdf.ln(10)
-    pdf.cell(200, 10, txt=f"Project: {proj_name}", ln=True)
+    pdf.cell(200, 10, txt=f"Project: {proj}", ln=True)
     pdf.cell(200, 10, txt=f"Title: {title}", ln=True)
-    pdf.cell(200, 10, txt=f"Target Spec: +/- {target:.3f} mm", ln=True)
+    pdf.cell(200, 10, txt=f"Target: +/- {target:.3f} mm", ln=True)
     pdf.ln(5)
-    pdf.set_font("Arial", 'B', 12)
-    pdf.cell(200, 10, txt="Analysis Results:", ln=True)
-    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt=f"Results:", ln=True)
     pdf.cell(200, 10, txt=f"- Worst Case: +/- {wc:.3f} mm", ln=True)
     pdf.cell(200, 10, txt=f"- RSS Total: +/- {rss:.3f} mm", ln=True)
-    pdf.cell(200, 10, txt=f"- Estimated CPK: {cpk:.2f}", ln=True)
-    pdf.cell(200, 10, txt=f"- Estimated Yield: {yield_pct:.2f} %", ln=True)
+    pdf.cell(200, 10, txt=f"- Yield: {yield_val:.2f} % / CPK: {cpk:.2f}", ln=True)
     return pdf.output(dest="S").encode("latin-1")
 
-# --- 初始化 Session State (用於清除資料) ---
+# --- 資料初始化與清除功能 ---
 default_data = [
     {"Part": "PCB", "Req. CPK": 1.33, "No.": "a", "Description": "Panel mark to unit mark", "Upper Tol": 0.100, "Lower Tol": 0.100},
     {"Part": "PCB", "Req. CPK": 1.33, "No.": "b", "Description": "Unit mark to soldering pad", "Upper Tol": 0.100, "Lower Tol": 0.100},
@@ -46,74 +43,68 @@ default_data = [
     {"Part": "Connector", "Req. CPK": 1.33, "No.": "d", "Description": "Connector housing (0.25/2)", "Upper Tol": 0.125, "Lower Tol": 0.125},
 ]
 
-if 'table_data' not in st.session_state:
-    st.session_state.table_data = pd.DataFrame(default_data)
+if 'df_data' not in st.session_state:
+    st.session_state.df_data = pd.DataFrame(default_data)
 
-def clear_data():
-    st.session_state.table_data = pd.DataFrame(columns=["Part", "Req. CPK", "No.", "Description", "Upper Tol", "Lower Tol"])
-    st.rerun()
+def clear_all():
+    st.session_state.df_data = pd.DataFrame(columns=["Part", "Req. CPK", "No.", "Description", "Upper Tol", "Lower Tol"])
 
-# 頁面標題
+# --- 介面開始 ---
 st.markdown("<h2 style='text-align: center;'>設計累計公差分析</h2>", unsafe_allow_html=True)
 st.markdown("<h4 style='text-align: center;'>Design Tolerance Stack-up Analysis</h4>", unsafe_allow_html=True)
 
-# 專案基本資訊
 with st.container():
     c1, c2 = st.columns(2)
     with c1:
         proj_name = st.text_input("專案名稱 (Project Name)", "TM-P4125-001")
-        analysis_title = st.text_input("分析標題 (Title)", "Connector Y-Position Analysis")
+        title_text = st.text_input("分析標題 (Title)", "Connector Y-Position Analysis")
     with c2:
-        st.text_input("日期 (Date)", "2025/12/17")
+        st.text_input("日期 (Date)", "2025/12/29")
         st.text_input("尺寸單位 (Unit)", "mm")
 
 st.divider()
 
-# --- 圖片上傳區域 ---
-with st.container():
-    st.subheader("累積公差圖示 (Tolerance Stack-up Diagram)")
-    uploaded_image = st.file_uploader("匯入圖片檔 (Upload Image)", type=["png", "jpg", "jpeg"], key="diagram_uploader")
-    if uploaded_image is not None:
-        st.image(uploaded_image, use_container_width=True)
+# 圖片與表格緊湊排列
+st.subheader("累積公差圖示與數據輸入")
+uploaded_image = st.file_uploader("匯入圖片檔 (Upload Image)", type=["png", "jpg", "jpeg"], key="uploader")
 
-st.subheader("公差數據輸入 (Input Table)")
+if uploaded_image:
+    st.image(uploaded_image, use_container_width=True)
 
-# 工具按鈕：一鍵清除
-st.button("🗑️ 一鍵清除資料 (Clear All)", on_click=clear_data)
+# 工具列 (清除與匯出)
+col_btn1, col_btn2 = st.columns([1, 5])
+with col_btn1:
+    st.button("🗑️ 一鍵清除", on_click=clear_all)
 
-# 資料輸入表格
-edited_df = st.data_editor(st.session_state.table_data, num_rows="dynamic", use_container_width=True, key="data_editor")
-st.session_state.table_data = edited_df
+# 數據表格
+edited_df = st.data_editor(st.session_state.df_data, num_rows="dynamic", use_container_width=True)
+st.session_state.df_data = edited_df
 
-# 計算區
+# 計算
 target_spec = st.number_input("目前設計公差目標 (Target Spec ±)", value=0.200, format="%.3f")
 
-# --- 核心邏輯計算 ---
 if not edited_df.empty and "Upper Tol" in edited_df.columns:
-    worst_case = edited_df["Upper Tol"].sum()
-    rss_val = np.sqrt((edited_df["Upper Tol"]**2).sum())
-    est_cpk = target_spec / rss_val if rss_val != 0 else 0
-    z_score = 3 * est_cpk
-    yield_val = (2 * norm.cdf(z_score) - 1) * 100
+    wc = edited_df["Upper Tol"].sum()
+    rss = np.sqrt((edited_df["Upper Tol"]**2).sum())
+    cpk = target_spec / rss if rss != 0 else 0
+    yield_val = (2 * norm.cdf(3 * cpk) - 1) * 100
 else:
-    worst_case, rss_val, est_cpk, yield_val = 0, 0, 0, 0
+    wc, rss, cpk, yield_val = 0, 0, 0, 0
 
 st.divider()
 
-# 顯示結果
-st.subheader("公差疊加分析結果 (Results)")
+# 結果與匯出
+st.subheader("分析結果 (Results)")
 r1, r2, r3 = st.columns(3)
-r1.metric("Worst Case (最壞情況)", f"± {worst_case:.3f} mm")
-r2.metric("RSS Total (均方根)", f"± {rss_val:.3f} mm")
-r3.metric("預估良率 (Yield)", f"{yield_val:.2f} %")
+r1.metric("Worst Case", f"± {wc:.3f} mm")
+r2.metric("RSS Total", f"± {rss:.3f} mm")
+r3.metric("預估良率", f"{yield_val:.2f} %")
 
-st.info(f"結論：若採用 {target_spec:.3f} mm 為規格，預估良率約為 {yield_val:.2f}%，CPK 約為 {est_cpk:.2f}。")
+st.info(f"結論：若採用 {target_spec:.3f} mm 為規格，預估良率為 {yield_val:.2f}%，CPK 為 {cpk:.2f}。")
 
-# --- 匯出 PDF 功能 ---
-pdf_content = create_pdf(proj_name, analysis_title, target_spec, worst_case, rss_val, yield_val, est_cpk, edited_df)
-st.download_button(
-    label="📥 匯出 PDF 報告 (Export PDF)",
-    data=pdf_content,
-    file_name="tolerance_report.pdf",
-    mime="application/pdf"
-)
+# PDF 下載按鈕
+try:
+    pdf_bytes = create_pdf(proj_name, title_text, target_spec, wc, rss, yield_val, cpk)
+    st.download_button("📥 匯出 PDF 報告", data=pdf_bytes, file_name="Report.pdf", mime="application/pdf")
+except:
+    st.warning("PDF 僅支援英文字元產生，若需完整報告請確保標題為英文。")
