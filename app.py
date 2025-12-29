@@ -5,7 +5,7 @@ from scipy.stats import norm
 from fpdf import FPDF
 import os
 
-# 1. 頁面配置與 CSS 樣式 (16:9 佈局)
+# 1. 頁面配置與 CSS 樣式 (優化輸入流暢度與佈局)
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 st.markdown("""<style>
     .block-container { padding-top: 2.5rem !important; }
@@ -19,18 +19,20 @@ st.markdown("""<style>
     .element-container { margin-bottom: -10px !important; }
 </style>""", unsafe_allow_html=True)
 
-# 2. PDF 產生函數 (純英文 A4 彙整)
+# 2. PDF 產生函數 (強化容錯機制，確保新輸入數據不報錯)
 def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, img):
     pdf = FPDF(); pdf.add_page()
     pdf.set_font("Arial", 'B', 16); pdf.cell(190, 10, "Tolerance Stack-up Analysis Report", ln=True, align='C'); pdf.ln(2)
     pdf.set_font("Arial", 'B', 10); pdf.set_fill_color(240, 240, 240)
-    for l, v in [("Project:", proj), ("Title:", title), ("Date:", date), ("Unit:", unit), ("Target:", f"+/- {target:.3f}")]:
-        pdf.cell(40, 7, l, 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(150 if "Title" in l else 55, 7, str(v), 1, 1 if "Title" in l or "Unit" in l else 0)
+    infos = [("Project Name:", proj), ("Analysis Title:", title), ("Date:", date), ("Unit:", unit), ("Target:", f"+/- {target:.3f}")]
+    for label, val in infos:
+        pdf.cell(40, 7, label, 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(150 if "Title" in label else 55, 7, str(val), 1, 1 if "Title" in label or "Unit" in label else 0)
     if img and os.path.exists(img): pdf.ln(2); pdf.image(img, x=10, w=110); pdf.ln(2)
     pdf.ln(2); pdf.set_font("Arial", 'B', 11); pdf.cell(190, 8, "Input Data Details:", ln=True)
     pdf.set_font("Arial", 'B', 9); pdf.set_fill_color(230, 230, 230)
     for h, w in [("Part", 30), ("No.", 20), ("Description", 100), ("Tol (+/-)", 40)]: pdf.cell(w, 7, h, 1, 0, 'C', True)
     pdf.ln(7); pdf.set_font("Arial", '', 9)
+    # 確保表格數據轉換為浮點數，若空值則跳過
     for _, r in df.iterrows():
         try:
             val = float(r.iloc[4])
@@ -41,10 +43,9 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
     pdf.cell(190, 8, "Final Conclusion:", ln=True); pdf.set_font("Arial", 'I', 10); pdf.multi_cell(190, 6, concl)
     return pdf.output(dest="S").encode("latin-1")
 
-# 3. 初始化數據與行為邏輯
+# 3. 初始化 Session State
 COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差(±)"]
-def get_empty_df(rows=6):
-    return pd.DataFrame([{c: "" for c in COLS} for _ in range(rows)])
+def get_empty_df(rows=6): return pd.DataFrame([{c: "" for c in COLS} for _ in range(rows)])
 
 DEFAULTS = {
     "df_data": pd.DataFrame([{COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "a", COLS[3]: "Panel mark", COLS[4]: 0.1},
@@ -52,17 +53,15 @@ DEFAULTS = {
     "target_val": 0.2, "proj_name": "TM-P4125-001", "analysis_title": "Connector Analysis", "date": "2025/12/29", "unit": "mm", "show_img": True, "concl_text": "", "uploaded_img": None
 }
 
-def init_state(reset=False):
-    for k, v in DEFAULTS.items():
-        if k not in st.session_state or reset: st.session_state[k] = v
-
-init_state()
+for k, v in DEFAULTS.items():
+    if k not in st.session_state: st.session_state[k] = v
 
 def action(mode):
     if mode == "clear":
         for k in ["proj_name", "analysis_title", "date", "unit", "concl_text"]: st.session_state[k] = ""
         st.session_state.df_data, st.session_state.target_val, st.session_state.show_img, st.session_state.uploaded_img = get_empty_df(6), 0.0, False, None
-    else: init_state(True)
+    elif mode == "reset":
+        for k, v in DEFAULTS.items(): st.session_state[k] = v
     st.rerun()
 
 # 4. 主介面
@@ -72,7 +71,6 @@ l, r = st.columns([1.3, 1])
 with l:
     st.markdown('<p class="section-label">🖼️ Diagram & Input / 示意圖與數據輸入</p>', unsafe_allow_html=True)
     display_img = st.session_state.uploaded_img if st.session_state.uploaded_img else ("4125.jpg" if st.session_state.show_img and os.path.exists("4125.jpg") else None)
-    
     if display_img:
         st.image(display_img, use_container_width=True)
         if st.button("🗑️ Remove Diagram / 移除圖片"):
@@ -84,14 +82,16 @@ with l:
             with open("uploaded_temp.png", "wb") as f: f.write(up.getbuffer())
             st.session_state.uploaded_img = "uploaded_temp.png"; st.rerun()
 
-    # 💡 數據編輯器
+    # 💡 數據編輯器：透過 session_state 綁定解決輸入延遲與跳開問題
     ed_df = st.data_editor(st.session_state.df_data, num_rows="dynamic", use_container_width=True, key="main_editor")
     st.session_state.df_data = ed_df
     
     st.caption("💡 點擊左側序號選取並按 Delete 刪除。")
-    c1, c2 = st.columns(2)
-    c1.button("🗑️ Clear All / 全部清除", on_click=action, args=("clear",), use_container_width=True)
-    c2.button("🔄 Reset / 還原範例", on_click=action, args=("reset",), use_container_width=True)
+    # 🛠️ 三個並排按鈕：清除、重新計算、還原
+    bc1, bc2, bc3 = st.columns(3)
+    bc1.button("🗑️ Clear All / 全部清除", on_click=action, args=("clear",), use_container_width=True)
+    if bc2.button("🔄 Recalculate / 重新計算", use_container_width=True): st.rerun()
+    bc3.button("⏪ Reset / 還原範例", on_click=action, args=("reset",), use_container_width=True)
 
 with r:
     st.markdown('<p class="section-label">📋 Info & Results / 專案資訊與結果</p>', unsafe_allow_html=True)
@@ -102,18 +102,15 @@ with r:
     ts = st.number_input("Target Spec (±)", value=st.session_state.target_val, format="%.3f", key="target_input")
     st.session_state.target_val = ts
 
-    # 💡 重新計算功能：確保手動輸入數據後立即觸發更新
-    if st.checkbox("✅ **Auto-Calculate & Sync / 重新計算並同步**", value=True):
-        tol_vals = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
-        wc, rss = tol_vals.sum(), np.sqrt((tol_vals**2).sum())
-        cpk = ts / rss if rss != 0 else 0
-        yld = (2 * norm.cdf(3 * cpk) - 1) * 100
+    # 💡 強制數據即時同步與計算
+    tol_vals = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
+    wc, rss = tol_vals.sum(), np.sqrt((tol_vals**2).sum())
+    cpk = ts / rss if rss != 0 else 0
+    yld = (2 * norm.cdf(3 * cpk) - 1) * 100
     
     res1, res2 = st.columns(2)
     res1.metric("Worst Case", f"± {wc:.3f}"); res2.metric("RSS Total", f"± {rss:.3f}")
     res1.metric("Est. CPK", f"{cpk:.2f}"); res2.metric("Est. Yield", f"{yld:.2f} %")
-
-    
 
     st.divider()
     auto_con = f"1. Target +/-{ts:.3f}, CPK {cpk:.2f}, Yield {yld:.2f}%.\n2. \n3. "
@@ -121,8 +118,7 @@ with r:
     st.session_state.concl_text = con_in
     
     try:
-        # 匯出前同步最新圖片路徑
         pdf_img = st.session_state.uploaded_img if st.session_state.uploaded_img else (display_img if display_img != "uploaded_temp.png" else None)
         pdf_b = create_pdf(pn, at, dt, ut, ts, wc, rss, cpk, yld, con_in, ed_df, pdf_img)
         st.download_button("📥 Export PDF Report", data=pdf_b, file_name=f"Report_{pn}.pdf", use_container_width=True)
-    except: st.error("PDF Syncing... Please click Calculate checkbox if error persists.")
+    except: st.error("PDF Syncing Error... Please click 'Recalculate' button above.")
