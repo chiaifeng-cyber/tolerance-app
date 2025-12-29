@@ -10,17 +10,16 @@ st.markdown("""<style>
     .stApp { background-color: #f0f2f6; }
     /* 縮小邊距以符合 Window 介面全覽 */
     .main .block-container { padding-top: 2.2rem !important; padding-bottom: 0rem !important; }
-    
     h2 { line-height: 1.1; font-size: 22px; text-align: center; margin-top: -1.5rem; margin-bottom: 10px; color: #333; }
     
     .section-label, [data-testid="stMetricLabel"], .stTextArea label p { 
         font-size: 18px !important; font-weight: bold !important; color: #333; 
     }
     
-    /* 專案資訊標籤非粗體 */
+    /* 專案資訊標籤設定為非粗體 */
     .stTextInput label p { font-weight: normal !important; font-size: 14px !important; }
     
-    /* Target Spec 標籤粗體 */
+    /* Target Spec 標籤設定為黑色粗體 */
     [data-testid="stNumberInput"] label p { font-size: 16px !important; font-weight: bold !important; color: #000 !important; }
     
     /* 圓角反白輸入框樣式 */
@@ -79,7 +78,7 @@ with l:
         current_img = "temp.png" if os.path.exists("temp.png") else ("4125.jpg" if os.path.exists("4125.jpg") else None)
         if current_img: st.image(current_img, use_container_width=True)
 
-    # 💡 數據編輯器：根據圖片比例設定欄位寬度
+    # 數據編輯器：根據圖片比例設定欄位寬度比例
     ed_df = st.data_editor(
         st.session_state.df_data, 
         num_rows="dynamic", 
@@ -142,6 +141,7 @@ with r:
     res2.metric("Est. Yield", res["yld"])
 
     
+
     st.divider()
     con_auto = (
         f"1. Target +/-{st.session_state.target_val:.3f}, CPK {res['cpk']}, Yield {res['yld']}.\n"
