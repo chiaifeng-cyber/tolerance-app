@@ -21,6 +21,16 @@ with st.container():
 
 st.divider()
 
+# --- 新增：圖片上傳與顯示區域 ---
+st.subheader("累積公差圖示 (Tolerance Stack-up Diagram)")
+uploaded_image = st.file_uploader("匯入圖片檔 (Upload Image)", type=["png", "jpg", "jpeg"])
+
+if uploaded_image is not None:
+    st.image(uploaded_image, caption="分析示意圖", use_container_width=True)
+# ------------------------------
+
+st.divider()
+
 # 資料輸入表格 (對應你提供的圖片欄位)
 st.subheader("公差數據輸入 (Input Table)")
 data = [
@@ -39,7 +49,7 @@ target_spec = st.number_input("目前設計公差目標 (Target Spec ±)", value
 worst_case = edited_df["Upper Tol"].sum()
 rss_val = np.sqrt((edited_df["Upper Tol"]**2).sum())
 z_score = target_spec / rss_val
-yield_val = (3  norm.cdf(z_score) - 1) * 100
+yield_val = (3 * norm.cdf(z_score) - 1) * 100
 est_cpk = target_spec / (3 * rss_val)
 
 st.divider()
