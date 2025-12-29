@@ -21,15 +21,25 @@ st.markdown("""<style>
     [data-testid="stElementToolbar"] { display: none !important; }
 </style>""", unsafe_allow_html=True)
 
-# 2. 數據初始化與管理
+# 2. 數據初始化與圖片清理邏輯
 COLS = ["Part 零件", "Req. CPK 要求 (min. 1.0)", "No. 編號", "Description 描述", "Tol. 公差(±)"]
+
+def delete_temp_images():
+    """主動刪除暫存的圖片檔案"""
+    temp_files = ["temp.png", "temp.jpg", "temp.jpeg"]
+    for f in temp_files:
+        if os.path.exists(f):
+            try:
+                os.remove(f)
+            except:
+                pass
 
 def get_init_df():
     return pd.DataFrame([
         {COLS[0]: "PCB", COLS[1]: "1.33", COLS[2]: "a", COLS[3]: "Panel mark to unit mark", COLS[4]: 0.1},
         {COLS[0]: "PCB", COLS[1]: "1.33", COLS[2]: "b", COLS[3]: "Unit mark to soldering pad", COLS[4]: 0.1},
-        {COLS[0]: "SMT", COLS[1]: "1.0", COLS[2]: "c", COLS[3]: "Assy Process", COLS[4]: 0.15},
-        {COLS[0]: "Connector", COLS[1]: "1.33", COLS[2]: "d", COLS[3]: "Connector housing", COLS[4]: 0.125}
+        {COLS[0]: "SMT", COLS[1]: "1.0", COLS[2]: "c", COLS[3]: "SMT tolerance", COLS[4]: 0.15},
+        {COLS[0]: "Connector", COLS[1]: "1.33", COLS[2]: "d", COLS[3]: "Connector housing (0.25/2)", COLS[4]: 0.125}
     ])
 
 if 'df_data' not in st.session_state:
@@ -38,23 +48,19 @@ if 'df_data' not in st.session_state:
     st.session_state.show_img = True
 
 def action(mode):
-    # 💡 物理刪除上傳的暫存圖片
-    if os.path.exists("temp.png"):
-        try:
-            os.remove("temp.png")
-        except:
-            pass
-
+    # 💡 執行清除動作時，主動刪除所有格式的暫存圖檔
+    delete_temp_images()
+    
     if mode == "clear":
         st.session_state.df_data = pd.DataFrame([
             {COLS[0]: "", COLS[1]: "", COLS[2]: "", COLS[3]: "", COLS[4]: None} for _ in range(6)
         ])
         st.session_state.target_val = 0.0
-        st.session_state.show_img = False  # 清除時完全不顯示圖片
+        st.session_state.show_img = False
     elif mode == "reset":
         st.session_state.df_data = get_init_df()
         st.session_state.target_val = 0.2
-        st.session_state.show_img = True   # 重置時強制回到顯示模式 (將抓取 4125.jpg)
+        st.session_state.show_img = True
     st.rerun()
 
 # 3. 主介面
@@ -63,18 +69,30 @@ l, r = st.columns([1.3, 1])
 
 with l:
     st.markdown('<p class="section-label">🖼️ Diagram & Input / 示意圖與數據輸入</p>', unsafe_allow_html=True)
-    up = st.file_uploader("Upload Image", type=["jpg", "png"], label_visibility="collapsed")
+    up = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"], label_visibility="collapsed")
     if up:
-        with open("temp.png", "wb") as f: f.write(up.getbuffer())
+        # 根據上傳格式儲存
+        ext = up.name.split('.')[-1].lower()
+        fname = f"temp.{ext}"
+        delete_temp_images() # 先清理舊的
+        with open(fname, "wb") as f: 
+            f.write(up.getbuffer())
         st.session_state.show_img = True
     
-    # 💡 顯示邏輯：若 temp.png 存在則顯示，否則嘗試 4125.jpg
+    # 💡 顯示邏輯：優先檢查是否有任何 temp 開頭的圖片
     if st.session_state.show_img:
-        current_img = "temp.png" if os.path.exists("temp.png") else ("4125.jpg" if os.path.exists("4125.jpg") else None)
-        if current_img: 
+        current_img = None
+        for ext in ["png", "jpg", "jpeg"]:
+            if os.path.exists(f"temp.{ext}"):
+                current_img = f"temp.{ext}"
+                break
+        if not current_img and os.path.exists("4125.jpg"):
+            current_img = "4125.jpg"
+        
+        if current_img:
             st.image(current_img, use_container_width=True)
 
-    # 💡 表格配置與比例
+    # 💡 表格配置與自動比例
     ed_df = st.data_editor(
         st.session_state.df_data, 
         num_rows="dynamic", 
@@ -89,7 +107,7 @@ with l:
     )
     st.session_state.df_data = ed_df
 
-    # 💡 即時自動計算
+    # 💡 即時連動計算
     tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
     wc_v = tols.sum()
     rss_v = np.sqrt((tols**2).sum())
@@ -110,7 +128,7 @@ with r:
     ts = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f")
     st.session_state.target_val = ts
 
-    # 💡 統計計算連動
+    # 💡 統計指標計算
     cpk_v = ts / rss_v if rss_v > 0 else 0
     yld_v = (2 * norm.cdf(3 * cpk_v) - 1) * 100 if rss_v > 0 else 0
 
