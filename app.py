@@ -44,8 +44,10 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
 # 3. 初始化數據與邏輯
 COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差(±)"]
 DEFAULTS = {
-    "df_data": pd.DataFrame([{"Part 零件": "PCB", "Req. CPK 要求": 1.33, "No. 編號": "a", "Description 描述": "Panel mark", "Tol. 公差(±)": 0.1},
-                             {"Part 零件": "Connector", "Req. CPK 要求": 1.33, "No. 編號": "d", "Description 描述": "Housing", "Tol. 公差(±)": 0.125}]),
+    "df_data": pd.DataFrame([{"Part 零件": "PCB", "Req. CPK 要求": 1.33, "No. 編號": "a", "Description 描述": "Panel mark to unit mark", "Tol. 公差(±)": 0.1},
+                             {"Part 零件": "PCB", "Req. CPK 要求": 1.33, "No. 編號": "b", "Description 描述": "Unit mark to soldering pad", "Tol. 公差(±)": 0.10}]),
+                             {"Part 零件": "SMT", "Req. CPK 要求": 1.0, "No. 編號": "c", "Description 描述": "Assy Process", "Tol. 公差(±)": 0.15}]),  
+                             {"Part 零件": "Connector", "Req. CPK 要求": 1.0, "No. 編號": "d", "Description 描述": "Connector housing (0.25/2)", "Tol. 公差(±)": 0.125}]), 
     "target_val": 0.2, "proj_name": "TM-P4125-001", "analysis_title": "Connector Analysis", "date": "2025/12/29", "unit": "mm", "show_img": True, "concl_text": ""
 }
 
@@ -108,3 +110,4 @@ with r:
         pdf_b = create_pdf(pn, at, dt, ut, ts, wc, rss, cpk, yld, con_in, ed_df, img)
         st.download_button("📥 Export PDF Report", data=pdf_b, file_name=f"Report_{pn}.pdf", use_container_width=True)
     except: st.error("PDF Error")
+
