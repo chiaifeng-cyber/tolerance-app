@@ -26,6 +26,19 @@ st.subheader("累積公差圖示 (Tolerance Stack-up Diagram)")
 uploaded_image = st.file_uploader("匯入圖片檔 (Upload Image)", type=["png", "jpg", "jpeg"])
 
 if uploaded_image is not None:
+    # 顯示使用者上傳的圖片
+    st.image(uploaded_image, caption="分析示意圖", use_container_width=True)
+else:
+    # 提示上傳圖片
+    st.info("請上傳分析示意圖 (例如：panel mark 或 unit mark 的標註圖)。")
+
+st.divider()
+
+# --- 新增：圖片上傳與顯示區域 ---
+st.subheader("累積公差圖示 (Tolerance Stack-up Diagram)")
+uploaded_image = st.file_uploader("匯入圖片檔 (Upload Image)", type=["png", "jpg", "jpeg"])
+
+if uploaded_image is not None:
     st.image(uploaded_image, caption="分析示意圖", use_container_width=True)
 # ------------------------------
 
