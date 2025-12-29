@@ -4,32 +4,47 @@ import numpy as np
 from scipy.stats import norm
 import os
 
-# 1. Page Configuration & Professional CSS
+# 1. Page Configuration & Compact Layout CSS
 st.set_page_config(page_title="Tolerance Stack-up Tool", layout="wide")
 st.markdown("""<style>
+    /* 強制縮減全頁面邊距，使內容更緊湊 */
     .stApp { background-color: #f0f2f6; }
-    .main .block-container { padding-top: 2.2rem !important; padding-bottom: 0rem !important; }
-    h2 { line-height: 1.1; font-size: 22px; text-align: center; margin-top: -1.5rem; margin-bottom: 10px; color: #333; }
-    
-    /* Section Labels & Metric Labels */
-    .section-label, [data-testid="stMetricLabel"], .stTextArea label p, .stNumberInput label p { 
-        font-size: 18px !important; font-weight: bold !important; color: #333; 
+    .main .block-container { 
+        padding-top: 1rem !important; 
+        padding-bottom: 0rem !important; 
+        max-width: 98% !important;
     }
     
-    /* Specific styling for Project Info labels (Non-bold) */
-    .stTextInput label p { font-weight: normal !important; font-size: 14px !important; }
+    /* 縮小主標題間距 */
+    h2 { line-height: 1; font-size: 22px; text-align: center; margin-top: -1.5rem; margin-bottom: 10px; color: #1e1e1e; }
     
-    /* Rounded Input Boxes */
+    /* 調整區塊標籤與間距 */
+    .section-label, [data-testid="stMetricLabel"], .stTextArea label p, .stNumberInput label p { 
+        font-size: 16px !important; font-weight: bold !important; color: #333; 
+        margin-bottom: 4px !important;
+    }
+    
+    /* 調整輸入框高度與圓角 */
     div[data-testid="stTextInput"] input, 
     div[data-testid="stNumberInput"] input,
     div[data-testid="stTextArea"] textarea {
         background-color: #ffffff !important;
         border-radius: 8px !important;
-        padding: 5px !important;
+        padding: 4px 8px !important;
         border: 1px solid #d1d5db !important;
     }
+    
+    /* 移除 Streamlit 預設的元件下方過大間距 */
+    [data-testid="stVerticalBlock"] > div { margin-bottom: 4px !important; gap: 0.5rem !important; }
+    
+    /* 數據表格美化 */
     div[data-testid="stDataEditor"] { background-color: #ffffff !important; border-radius: 8px !important; }
+    
+    /* Metric 數值大小微調 */
     [data-testid="stMetricValue"] { font-size: 22px !important; font-weight: bold; color: #1f77b4 !important; }
+    
+    /* 隱藏不必要的元素 */
+    hr { display: none !important; }
     [data-testid="stElementToolbar"] { display: none !important; }
 </style>""", unsafe_allow_html=True)
 
@@ -55,7 +70,7 @@ def action(mode):
     st.session_state.uploader_key += 1
     if mode == "clear":
         st.session_state.df_data = pd.DataFrame([
-            {COLS[0]: "", COLS[1]: "", COLS[2]: "", COLS[3]: "", COLS[4]: None} for _ in range(6)
+            {COLS[0]: "", COLS[1]: "", COLS[2]: "", COLS[3]: "", COLS[4]: None} for _ in range(5)
         ])
         st.session_state.target_val = 0.0
         st.session_state.show_img = False
@@ -71,9 +86,9 @@ def action(mode):
             except: pass
     st.rerun()
 
-# 3. Main Interface
+# 3. Main Interface Layout
 st.markdown("<h2>Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=True)
-l, r = st.columns([1.3, 1])
+l, r = st.columns([1.4, 1])
 
 with l:
     st.markdown('<p class="section-label">🖼️ Diagram & Input</p>', unsafe_allow_html=True)
@@ -92,15 +107,18 @@ with l:
                 break
         if not current_img and os.path.exists("4125.jpg"):
             current_img = "4125.jpg"
-        if current_img: st.image(current_img, use_container_width=True)
+        if current_img: 
+            # 限制圖片高度以確保不超出螢幕
+            st.image(current_img, use_container_width=True)
 
+    # 調整表格欄位寬度以確保 Req. CPK 標題不被切斷
     ed_df = st.data_editor(
         st.session_state.df_data, 
         num_rows="dynamic", 
         use_container_width=True,
         column_config={
             COLS[0]: st.column_config.TextColumn(width="small"),
-            COLS[1]: st.column_config.TextColumn(width="small"),
+            COLS[1]: st.column_config.TextColumn(width="medium"), # 設為 medium 以顯示完整標題
             COLS[2]: st.column_config.TextColumn(width="small"),
             COLS[3]: st.column_config.TextColumn(width="large"),
             COLS[4]: st.column_config.NumberColumn(width="small", format="%.3f"),
@@ -120,19 +138,18 @@ with r:
     # --- Block 1: Project Information ---
     st.markdown('<p class="section-label">📋 Project Information</p>', unsafe_allow_html=True)
     with st.container(border=True):
-        pn = st.text_input("Project Name", value="TM-P4125-001" if st.session_state.show_img else "")
-        at = st.text_input("Analysis Title", value="Connector Analysis" if st.session_state.show_img else "")
+        pn = st.text_input("Project Name", value="TM-P4125-001" if st.session_state.show_img else "", label_visibility="collapsed")
+        at = st.text_input("Analysis Title", value="Connector Analysis" if st.session_state.show_img else "", label_visibility="collapsed")
         c1, c2 = st.columns(2)
-        dt = c1.text_input("Date", value="2025/12/30" if st.session_state.show_img else "")
-        ut = c2.text_input("Unit", value="mm" if st.session_state.show_img else "")
+        dt = c1.text_input("Date", value="2025/12/30" if st.session_state.show_img else "", label_visibility="collapsed")
+        ut = c2.text_input("Unit", value="mm" if st.session_state.show_img else "", label_visibility="collapsed")
     
-    # --- Block 2: Target Spec with Calculator Icon & Border ---
+    # --- Block 2: Target Spec & Results ---
     st.markdown('<p class="section-label">⌨️ Target Spec (±)</p>', unsafe_allow_html=True)
     with st.container(border=True):
-        ts = st.number_input("Target Spec (±)", value=st.session_state.target_val, format="%.3f", label_visibility="collapsed")
+        ts = st.number_input("Target Spec", value=st.session_state.target_val, format="%.3f", label_visibility="collapsed")
         st.session_state.target_val = ts
 
-        # Analysis Result Sync
         cpk_v = ts / rss_v if rss_v > 0 else 0
         yld_v = (2 * norm.cdf(3 * cpk_v) - 1) * 100 if rss_v > 0 else 0
 
@@ -142,16 +159,11 @@ with r:
         res1.metric("Est. CPK", f"{cpk_v:.2f}" if rss_v > 0 else "")
         res2.metric("Est. Yield", f"{yld_v:.2f} %" if rss_v > 0 else "")
 
-    
-    st.divider()
-    
-    # --- Block 3: Conclusion with Border ---
+    # --- Block 3: Conclusion ---
     st.markdown('<p class="section-label">✍️ Conclusion</p>', unsafe_allow_html=True)
     with st.container(border=True):
         con_auto = (
             f"1. Target +/-{ts:.3f}, CPK {cpk_v:.2f}, Yield {yld_v:.2f}%.\n"
-            f"2. In RSS calculation, all tolerances must be controlled with CPK ≥ 1.0.\n"
-            f"3. \n"
-            f"4. "
+            f"2. All tolerances must be CPK ≥ 1.0."
         )
-        st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=130, label_visibility="collapsed")
+        st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=100, label_visibility="collapsed")
