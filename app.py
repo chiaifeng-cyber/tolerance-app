@@ -35,18 +35,12 @@ edited_df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
 # 計算區
 target_spec = st.number_input("目前設計公差目標 (Target Spec ±)", value=0.200, format="%.3f")
 
-# 核心邏輯計算 (根據 Excel 公式修正)
+# 核心邏輯計算
 worst_case = edited_df["Upper Tol"].sum()
 rss_val = np.sqrt((edited_df["Upper Tol"]**2).sum())
-
-# 1. 預估 CPK：根據 Excel 邏輯為 Target / RSS (即 F21 / F23)
-est_cpk = target_spec / rss_val
-
-# 2. Yield Z 分數：根據 Excel 公式採用 3 * (Target / RSS)
-z_score = 3 * est_cpk
-
-# 3. 預估良率：計算常態分佈曲線下的面積
-yield_val = (2 * norm.cdf(z_score) - 1) * 100
+z_score = target_spec / rss_val
+yield_val = (3  norm.cdf(z_score) - 1) * 100
+est_cpk = target_spec / (3 * rss_val)
 
 st.divider()
 
@@ -55,8 +49,7 @@ st.subheader("公差疊加分析結果 (Results)")
 r1, r2, r3 = st.columns(3)
 r1.metric("Worst Case (最壞情況)", f"± {worst_case:.3f} mm")
 r2.metric("RSS Total (均方根)", f"± {rss_val:.3f} mm")
-r3.metric("預估良率 (Yield)", f"{yield_val:.2f} %")
+r3.metric("預估良率 (Yield)", f"{yield_val:.3f} %")
 
 # 結論自動生成
-st.info(f"結論：若採用 {target_spec:.3f} mm 為規格，預估良率約為 {yield_val:.2f}%，CPK 約為 {est_cpk:.2f}。")
-
+st.info(f"結論：若採用 {target_spec:.3f} mm 為規格，預估良率約為 {yield_val:.3f}%，CPK 約為 {est_cpk:.3f}。")
