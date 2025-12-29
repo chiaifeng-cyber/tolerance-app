@@ -8,7 +8,7 @@ import os
 # 1. 頁面配置
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 
-# 2. CSS 樣式：優化 16:9 佈局與字體層次
+# 2. CSS 樣式：優化佈局與字體層次
 st.markdown("""
     <style>
     .block-container { padding-top: 2.5rem !important; padding-bottom: 0rem !important; }
@@ -31,35 +31,26 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. PDF 產生函數：縮減間距以優化佈局
+# 3. PDF 產生函數
 def create_full_page_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, img):
     pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.add_page()
-    
-    # 標題 (縮減頂部邊距)
     pdf.set_font("Arial", 'B', 16)
     pdf.cell(190, 10, txt="Tolerance Stack-up Analysis Report", ln=True, align='C')
-    pdf.ln(2) # 原本為 5
+    pdf.ln(2)
     
-    # 專案資訊區
     pdf.set_font("Arial", 'B', 10)
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(40, 7, "Project Name:", 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(150, 7, str(proj), 1, 1)
-    pdf.set_font("Arial", 'B', 10)
     pdf.cell(40, 7, "Analysis Title:", 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(150, 7, str(title), 1, 1)
-    pdf.set_font("Arial", 'B', 10)
     pdf.cell(40, 7, "Date:", 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(55, 7, str(date), 1, 0); 
-    pdf.set_font("Arial", 'B', 10); pdf.cell(40, 7, "Unit:", 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(55, 7, str(unit), 1, 1)
+    pdf.cell(40, 7, "Unit:", 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(55, 7, str(unit), 1, 1)
     
-    # 示意圖：縮減下方間距
     if img and os.path.exists(img):
         pdf.ln(4)
         pdf.image(img, x=10, w=110)
-        pdf.ln(2) # 顯著縮減示意圖下方的空白區域
-    else:
         pdf.ln(2)
-
-    # 數據表格
+    
     pdf.ln(2); pdf.set_font("Arial", 'B', 11); pdf.cell(190, 8, "Input Data Details:", ln=True)
     pdf.set_font("Arial", 'B', 9); pdf.set_fill_color(230, 230, 230)
     pdf.cell(30, 7, "Part", 1, 0, 'C', True); pdf.cell(20, 7, "No.", 1, 0, 'C', True); 
@@ -72,27 +63,26 @@ def create_full_page_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, con
         pdf.cell(100, 7, str(row.iloc[3]), 1)
         pdf.cell(40, 7, f"{row.iloc[4]:.3f}", 1, 1)
         
-    # 分析結果：緊湊佈局
     pdf.ln(4); pdf.set_font("Arial", 'B', 11); pdf.cell(190, 8, "Analysis Summary (based on RSS 3-Sigma):", ln=True)
     pdf.set_font("Arial", 'B', 10)
     pdf.cell(47, 10, f"Worst Case: {wc:.3f}", 1, 0, 'C'); pdf.cell(47, 10, f"RSS Total: {rss:.3f}", 1, 0, 'C')
     pdf.cell(48, 10, f"Est. CPK: {cpk:.2f}", 1, 0, 'C'); pdf.cell(48, 10, f"Est. Yield: {yld:.2f}%", 1, 1, 'C')
 
-    # 結論區：移除多餘換行
     pdf.ln(4); pdf.set_font("Arial", 'B', 11); pdf.cell(190, 8, "Final Conclusion:", ln=True)
     pdf.set_font("Arial", 'I', 10); pdf.multi_cell(190, 6, txt=concl)
-    
     return pdf.output(dest="S").encode("latin-1")
 
 # 4. 初始化與 Session State
-COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差"]
+# 調整欄位名稱至「Tol. 公差(±)」
+COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差(±)"]
 DEFAULT_DATA = [
     {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "a", COLS[3]: "Panel mark to unit mark", COLS[4]: 0.1},
     {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "b", COLS[3]: "Unit mark to soldering pad", COLS[4]: 0.1},
     {COLS[0]: "SMT", COLS[1]: 1.0, COLS[2]: "c", COLS[3]: "SMT tolerance", COLS[4]: 0.15},
     {COLS[0]: "Connector", COLS[1]: 1.33, COLS[2]: "d", COLS[3]: "Connector housing", COLS[4]: 0.125}
 ]
-DEFAULT_CONCL_TEMPLATE = "1. {}\n2. \n3. \n4. \n5. "
+# 結論縮減為 3 行模板
+DEFAULT_CONCL_TEMPLATE = "1. {}\n2. \n3. "
 
 def init_state(reset_all=False):
     if 'df_data' not in st.session_state or reset_all: st.session_state.df_data = pd.DataFrame(DEFAULT_DATA)
