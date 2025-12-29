@@ -5,18 +5,18 @@ from scipy.stats import norm
 from fpdf import FPDF
 import os
 
-# 1. 頁面配置與進階 CSS 樣式 (圓角反白輸入框與灰色底色)
+# 1. 頁面配置與進階 CSS 樣式
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 st.markdown("""<style>
-    /* 灰色背景底色 */
     .stApp { background-color: #f0f2f6; }
     .main .block-container { padding-top: 3rem !important; }
-    
-    /* 標題與標籤樣式 */
     h2 { line-height: 1.2; font-size: 24px; text-align: center; margin-top: -1.5rem; color: #333; }
     .section-label, [data-testid="stMetricLabel"], .stTextArea label p { font-size: 20px !important; font-weight: bold; color: #333; }
     
-    /* 圓角反白輸入框效果 (與圖片一致) */
+    /* Target Spec 標籤設定為粗體字 */
+    [data-testid="stNumberInput"] label p { font-size: 18px !important; font-weight: bold !important; color: #000 !important; }
+    
+    /* 圓角反白輸入框 */
     div[data-testid="stTextInput"] input, 
     div[data-testid="stNumberInput"] input,
     div[data-testid="stTextArea"] textarea {
@@ -25,22 +25,12 @@ st.markdown("""<style>
         border: 1px solid #d1d5db !important;
         padding: 10px !important;
     }
-    
-    /* 數據編輯器背景與圓角 */
-    div[data-testid="stDataEditor"] {
-        background-color: #ffffff !important;
-        border-radius: 10px !important;
-        padding: 5px;
-    }
-
-    /* Metric 數值大小與顏色 */
+    div[data-testid="stDataEditor"] { background-color: #ffffff !important; border-radius: 10px !important; padding: 5px; }
     [data-testid="stMetricValue"] { font-size: 26px !important; font-weight: bold; color: #1f77b4 !important; }
-    
-    /* 隱藏冗餘工具列 */
     [data-testid="stElementToolbar"] { display: none !important; }
 </style>""", unsafe_allow_html=True)
 
-# 2. PDF 產生函數 (純英文彙整)
+# 2. PDF 產生函數
 def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, img):
     pdf = FPDF(); pdf.add_page()
     pdf.set_font("Arial", 'B', 16); pdf.cell(190, 10, "Tolerance Stack-up Analysis Report", ln=True, align='C'); pdf.ln(5)
@@ -62,7 +52,7 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
     pdf.ln(5); pdf.cell(190, 8, "Final Conclusion:", ln=True); pdf.set_font("Arial", 'I', 10); pdf.multi_cell(190, 6, concl)
     return pdf.output(dest="S").encode("latin-1")
 
-# 3. 初始化數據管理
+# 3. 初始化數據
 COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差(±)"]
 def get_init_df():
     return pd.DataFrame([
@@ -76,18 +66,22 @@ if 'df_data' not in st.session_state:
     st.session_state.df_data = get_init_df()
     st.session_state.target_val = 0.2
     st.session_state.results = {"wc": "± 0.475", "rss": "± 0.241", "cpk": "0.83", "yld": "98.72 %"}
+    st.session_state.show_img = True
     st.session_state.is_cleared = False
 
 def action(mode):
     if mode == "clear":
         st.session_state.df_data = pd.DataFrame([{c: "" for c in COLS} for _ in range(6)])
         st.session_state.target_val = 0.0
-        st.session_state.results = {"wc": "", "rss": "", "cpk": "", "yld": ""} # 清除後不顯示數值
+        st.session_state.results = {"wc": "", "rss": "", "cpk": "", "yld": ""}
+        st.session_state.show_img = False # 💡 全部清除時隱藏圖片
+        if os.path.exists("temp.png"): os.remove("temp.png") # 💡 刪除暫存上傳圖
         st.session_state.is_cleared = True
     elif mode == "reset":
         st.session_state.df_data = get_init_df()
         st.session_state.target_val = 0.2
         st.session_state.results = {"wc": "± 0.475", "rss": "± 0.241", "cpk": "0.83", "yld": "98.72 %"}
+        st.session_state.show_img = True
         st.session_state.is_cleared = False
     st.rerun()
 
@@ -97,36 +91,43 @@ l, r = st.columns([1.3, 1])
 
 with l:
     st.markdown('<p class="section-label">🖼️ Diagram & Input / 示意圖與數據輸入</p>', unsafe_allow_html=True)
+    
+    # 💡 圖片顯示邏輯 (受 show_img 控制)
     up = st.file_uploader("Upload Image", type=["jpg", "png"], label_visibility="collapsed")
-    img_path = None
+    current_img = None
     if up:
         with open("temp.png", "wb") as f: f.write(up.getbuffer())
-        img_path = "temp.png"; st.image(img_path, use_container_width=True)
-    elif os.path.exists("4125.jpg"):
-        img_path = "4125.jpg"; st.image(img_path, use_container_width=True)
+        st.session_state.show_img = True
+    
+    if st.session_state.show_img:
+        if os.path.exists("temp.png"):
+            current_img = "temp.png"
+        elif os.path.exists("4125.jpg"):
+            current_img = "4125.jpg"
+        
+        if current_img:
+            st.image(current_img, use_container_width=True)
+            if st.button("🗑️ Remove Diagram"):
+                st.session_state.show_img = False
+                st.rerun()
 
-    # 💡 數據編輯器 (圓角反白底色)
     ed_df = st.data_editor(st.session_state.df_data, num_rows="dynamic", use_container_width=True)
     st.session_state.df_data = ed_df
     
-    st.caption("💡 點擊左側序號選取並按 Delete 刪除。")
     bc1, bc2, bc3 = st.columns(3)
     bc1.button("🗑️ Clear / 全部清除", on_click=action, args=("clear",), use_container_width=True)
     
-    # 💡 核心優化：手動點擊才重新計算，避免輸入延遲
     if bc2.button("🔄 Recalculate / 重新計算", use_container_width=True):
         tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
-        wc_val, rss_val = tols.sum(), np.sqrt((tols**2).sum())
-        ts = st.session_state.target_val
-        cpk_val = ts / rss_val if rss_val != 0 else 0
-        yld_val = (2 * norm.cdf(3 * cpk_val) - 1) * 100
+        wc_v, rss_v = tols.sum(), np.sqrt((tols**2).sum())
+        ts_v = st.session_state.target_val
+        cpk_v = ts_v / rss_v if rss_v != 0 else 0
         st.session_state.results = {
-            "wc": f"± {wc_val:.3f}", "rss": f"± {rss_val:.3f}",
-            "cpk": f"{cpk_val:.2f}", "yld": f"{yld_val:.2f} %"
+            "wc": f"± {wc_v:.3f}", "rss": f"± {rss_v:.3f}",
+            "cpk": f"{cpk_v:.2f}", "yld": f"{(2 * norm.cdf(3 * cpk_v) - 1) * 100:.2f} %"
         }
         st.session_state.is_cleared = False
         st.rerun()
-        
     bc3.button("⏪ Reset / 還原範例", on_click=action, args=("reset",), use_container_width=True)
 
 with r:
@@ -137,22 +138,20 @@ with r:
         c1, c2 = st.columns(2)
         dt, ut = c1.text_input("Date", value="2025/12/30"), c2.text_input("Unit", value="mm")
     
+    # 💡 標籤字體已由 CSS 設定為粗體
     ts = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f")
     st.session_state.target_val = ts
 
-    # 💡 結果顯示區：清除後不顯示數值
     res1, res2 = st.columns(2)
     res1.metric("Worst Case", st.session_state.results["wc"])
     res2.metric("RSS Total", st.session_state.results["rss"])
     res1.metric("Est. CPK", st.session_state.results["cpk"])
     res2.metric("Est. Yield", st.session_state.results["yld"])
 
-    
     st.divider()
     con_auto = f"1. Target +/-{ts:.3f}, CPK {st.session_state.results['cpk']}, Yield {st.session_state.results['yld']}."
     con_in = st.text_area("✍️ Conclusion 結論", value=con_auto if not st.session_state.is_cleared else "", height=120)
     
-    # PDF 匯出穩定性
     res = st.session_state.results
-    pdf_b = create_pdf(pn, at, dt, ut, ts, res["wc"], res["rss"], res["cpk"], res["yld"], con_in, ed_df, img_path)
+    pdf_b = create_pdf(pn, at, dt, ut, ts, res["wc"], res["rss"], res["cpk"], res["yld"], con_in, ed_df, current_img if st.session_state.show_img else None)
     st.download_button("📥 Export PDF Report", data=pdf_b, file_name=f"Report_{pn}.pdf", use_container_width=True)
