@@ -21,7 +21,7 @@ st.markdown("""<style>
     [data-testid="stElementToolbar"] { display: none !important; }
 </style>""", unsafe_allow_html=True)
 
-# 2. 初始化數據管理
+# 2. 數據初始化與管理
 COLS = ["Part 零件", "Req. CPK 要求 (min. 1.0)", "No. 編號", "Description 描述", "Tol. 公差(±)"]
 
 def get_init_df():
@@ -36,22 +36,25 @@ if 'df_data' not in st.session_state:
     st.session_state.df_data = get_init_df()
     st.session_state.target_val = 0.2
     st.session_state.show_img = True
-    st.session_state.is_reset_img = False
 
 def action(mode):
+    # 💡 物理刪除上傳的暫存圖片
+    if os.path.exists("temp.png"):
+        try:
+            os.remove("temp.png")
+        except:
+            pass
+
     if mode == "clear":
         st.session_state.df_data = pd.DataFrame([
             {COLS[0]: "", COLS[1]: "", COLS[2]: "", COLS[3]: "", COLS[4]: None} for _ in range(6)
         ])
         st.session_state.target_val = 0.0
-        st.session_state.show_img = False
-        if os.path.exists("temp.png"): os.remove("temp.png")
+        st.session_state.show_img = False  # 清除時完全不顯示圖片
     elif mode == "reset":
-        # 💡 重置時恢復數據並確保圖片路徑指向預設 4125.jpg
         st.session_state.df_data = get_init_df()
         st.session_state.target_val = 0.2
-        st.session_state.show_img = True
-        if os.path.exists("temp.png"): os.remove("temp.png")
+        st.session_state.show_img = True   # 重置時強制回到顯示模式 (將抓取 4125.jpg)
     st.rerun()
 
 # 3. 主介面
@@ -65,12 +68,13 @@ with l:
         with open("temp.png", "wb") as f: f.write(up.getbuffer())
         st.session_state.show_img = True
     
-    # 💡 圖片優先順序：上傳圖 > 預設圖
+    # 💡 顯示邏輯：若 temp.png 存在則顯示，否則嘗試 4125.jpg
     if st.session_state.show_img:
         current_img = "temp.png" if os.path.exists("temp.png") else ("4125.jpg" if os.path.exists("4125.jpg") else None)
-        if current_img: st.image(current_img, use_container_width=True)
+        if current_img: 
+            st.image(current_img, use_container_width=True)
 
-    # 💡 數據編輯器
+    # 💡 表格配置與比例
     ed_df = st.data_editor(
         st.session_state.df_data, 
         num_rows="dynamic", 
@@ -85,7 +89,7 @@ with l:
     )
     st.session_state.df_data = ed_df
 
-    # 💡 及時連動計算邏輯
+    # 💡 即時自動計算
     tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
     wc_v = tols.sum()
     rss_v = np.sqrt((tols**2).sum())
@@ -106,11 +110,10 @@ with r:
     ts = st.number_input("Target Spec 公差目標 (±)", value=st.session_state.target_val, format="%.3f")
     st.session_state.target_val = ts
 
-    # 💡 計算 CPK 與 良率
+    # 💡 統計計算連動
     cpk_v = ts / rss_v if rss_v > 0 else 0
     yld_v = (2 * norm.cdf(3 * cpk_v) - 1) * 100 if rss_v > 0 else 0
 
-    # 顯示結果
     res1, res2 = st.columns(2)
     res1.metric("Worst Case", f"± {wc_v:.3f}" if wc_v > 0 else "")
     res2.metric("RSS Total", f"± {rss_v:.3f}" if rss_v > 0 else "")
