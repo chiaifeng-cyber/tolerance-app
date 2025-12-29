@@ -5,7 +5,7 @@ from scipy.stats import norm
 from fpdf import FPDF
 import os
 
-# 1. 頁面配置與 CSS 樣式 (保留 16:9 與底線設定)
+# 1. 頁面配置與 CSS
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 st.markdown("""<style>
     .block-container { padding-top: 2.5rem !important; }
@@ -30,25 +30,26 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
     if img and os.path.exists(img): pdf.ln(2); pdf.image(img, x=10, w=110); pdf.ln(2)
     pdf.ln(2); pdf.set_font("Arial", 'B', 11); pdf.cell(190, 8, "Input Data Details:", ln=True)
     pdf.set_font("Arial", 'B', 9); pdf.set_fill_color(230, 230, 230)
-    headers = [("Part", 30), ("No.", 20), ("Description", 100), ("Tol (+/-)", 40)]
-    for h, w in headers: pdf.cell(w, 7, h, 1, 0, 'C', True)
+    headers = ["Part", "No.", "Description", "Tol (+/-)"]
+    widths = [30, 20, 100, 40]
+    for i, h in enumerate(headers): pdf.cell(widths[i], 7, h, 1, 0, 'C', True)
     pdf.ln(7); pdf.set_font("Arial", '', 9)
     for _, r in df.iterrows():
-        pdf.cell(30, 7, str(r.iloc[0]), 1); pdf.cell(20, 7, str(r.iloc[2]), 1); pdf.cell(100, 7, str(r.iloc[3]), 1); pdf.cell(40, 7, f"{r.iloc[4]:.3f}", 1, 1)
+        pdf.cell(30, 7, str(r.iloc[0]), 1); pdf.cell(20, 7, str(r.iloc[2]), 1); pdf.cell(100, 7, str(r.iloc[3]), 1); pdf.cell(40, 7, f"{pd.to_numeric(r.iloc[4], errors='coerce'):.3f}", 1, 1)
     pdf.ln(4); pdf.set_font("Arial", 'B', 11); pdf.cell(190, 8, "Analysis Summary (RSS 3-Sigma):", ln=True)
     res_line = f"Worst Case: {wc:.3f} | RSS Total: {rss:.3f} | CPK: {cpk:.2f} | Yield: {yld:.2f}%"
     pdf.cell(190, 10, res_line, 1, 1, 'C'); pdf.ln(4); pdf.cell(190, 8, "Final Conclusion:", ln=True)
     pdf.set_font("Arial", 'I', 10); pdf.multi_cell(190, 6, concl)
     return pdf.output(dest="S").encode("latin-1")
 
-# 3. 初始化數據與邏輯 (修正語法錯誤)
+# 3. 初始化與數據處理
 COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差(±)"]
 DEFAULTS = {
     "df_data": pd.DataFrame([
         {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "a", COLS[3]: "Panel mark to unit mark", COLS[4]: 0.1},
         {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "b", COLS[3]: "Unit mark to soldering pad", COLS[4]: 0.1},
         {COLS[0]: "SMT", COLS[1]: 1.0, COLS[2]: "c", COLS[3]: "Assy Process", COLS[4]: 0.15},
-        {COLS[0]: "Connector", COLS[1]: 1.0, COLS[2]: "d", COLS[3]: "Connector housing (0.25/2)", COLS[4]: 0.125}
+        {COLS[0]: "Connector", COLS[1]: 1.33, COLS[2]: "d", COLS[3]: "Connector housing", COLS[4]: 0.125}
     ]),
     "target_val": 0.2, "proj_name": "TM-P4125-001", "analysis_title": "Connector Analysis", "date": "2025/12/29", "unit": "mm", "show_img": True, "concl_text": ""
 }
@@ -62,7 +63,8 @@ init_state()
 def action(mode):
     if mode == "clear":
         for k in ["proj_name", "analysis_title", "date", "unit", "concl_text"]: st.session_state[k] = ""
-        st.session_state.df_data, st.session_state.target_val, st.session_state.show_img = pd.DataFrame(columns=COLS), 0.0, False
+        st.session_state.df_data = pd.DataFrame(columns=COLS)
+        st.session_state.target_val, st.session_state.show_img = 0.0, False
     else: init_state(True)
 
 # 4. 主介面
@@ -78,7 +80,10 @@ with l:
         if up: 
             with open("temp.png", "wb") as f: f.write(up.getbuffer())
             img = "temp.png"; st.image(img, use_container_width=True)
+    
+    # 關鍵：這裡加入 hide_index=False 並強制欄位設定
     ed_df = st.data_editor(st.session_state.df_data, num_rows="dynamic", use_container_width=True, key="main_editor")
+    st.session_state.df_data = ed_df
     st.caption("💡 點擊左側序號選取並按 Delete 刪除。")
     c1, c2 = st.columns(2)
     c1.button("🗑️ Clear All / 全部清除", on_click=action, args=("clear",), use_container_width=True)
@@ -93,8 +98,10 @@ with r:
         dt, ut = c1.text_input("Date", key="date"), c2.text_input("Unit", key="unit")
     ts = st.number_input("Target Spec (±)", value=st.session_state.target_val, format="%.3f", key="target_input")
     
-    wc = ed_df[COLS[4]].sum() if not ed_df.empty else 0
-    rss = np.sqrt((ed_df[COLS[4]]**2).sum()) if not ed_df.empty else 0
+    # 強制轉換公差欄位為數字，避免重新輸入時報錯
+    tol_series = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
+    wc = tol_series.sum()
+    rss = np.sqrt((tol_series**2).sum())
     cpk = ts / rss if rss != 0 else 0
     yld = (2 * norm.cdf(3 * cpk) - 1) * 100
     
@@ -104,11 +111,10 @@ with r:
 
     
     st.divider()
-    auto_con = f"1. When Target Spec is +/-{ts:.3f} mm, CPK {cpk:.2f}, Expected Yield {yld:.2f}%.\n2. \n3. "
+    auto_con = f"1. Target +/-{ts:.3f}, CPK {cpk:.2f}, Yield {yld:.2f}%.\n2. \n3. "
     con_in = st.text_area("✍️ Conclusion 結論", value=st.session_state.concl_text or auto_con, height=160, key="concl_area")
     st.session_state.concl_text = con_in
     try:
         pdf_b = create_pdf(pn, at, dt, ut, ts, wc, rss, cpk, yld, con_in, ed_df, img)
         st.download_button("📥 Export PDF Report", data=pdf_b, file_name=f"Report_{pn}.pdf", use_container_width=True)
     except: st.error("PDF Error")
-
