@@ -1,5 +1,3 @@
-Python
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -54,4 +52,4 @@ r2.metric("RSS Total (均方根)", f"± {rss_val:.3f} mm")
 r3.metric("預估良率 (Yield)", f"{yield_val:.2f} %")
 
 # 結論自動生成
-st.info(f"結論：若採用 {target_spec:.3f} mm 為規格，預估良率約為 {yield_val:.2f}%，CPK
+st.info(f"結論：若採用 {target_spec:.3f} mm 為規格，預估良率約為 {yield_val:.2f}%，CPK 約為 {est_cpk:.2f}。")
