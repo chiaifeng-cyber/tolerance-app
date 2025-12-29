@@ -8,26 +8,27 @@ import os
 # 1. 頁面配置 (Page Config)
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 
-# 2. CSS 樣式：精確控制字體層次與佈局
+# 2. CSS 樣式：優化佈局、字體一致化、結論區底線
 st.markdown("""
     <style>
-    /* 修正頂部邊距，確保 16:9 一畫面全覽 */
+    /* 修正頂部邊距確保標題不切頂 */
     .block-container { padding-top: 2.5rem !important; padding-bottom: 0rem !important; }
     
     /* 大型字 (Title Layer): 26px 加粗 */
     h2 { line-height: 1.4 !important; font-size: 26px !important; text-align: center; margin-bottom: 10px !important; }
     
     /* 中型字 (Section Labels): 22px 加粗 */
+    /* 統一所有區域標籤與結論標籤字體大小為 22px 加粗 */
     .section-label, [data-testid="stMetricLabel"], .stTextArea label, .stSubheader h3 { 
         font-size: 22px !important; 
         font-weight: bold !important; 
         color: #333 !important; 
     }
     
-    /* 結果數值字體: 30px 加粗藍色 */
+    /* 結果數值字體放大至 30px */
     [data-testid="stMetricValue"] { font-size: 30px !important; font-weight: bold !important; color: #1f77b4 !important; }
     
-    /* 結論區底線間距優化：拉開文字與線的距離 */
+    /* 結論區底線間距優化 */
     .stTextArea textarea {
         background-attachment: local;
         background-image: linear-gradient(to right, white 0px, transparent 0px), 
@@ -39,7 +40,7 @@ st.markdown("""
         padding-top: 8px !important;
     }
 
-    /* 隱藏表格工具列並壓縮間距 */
+    /* 隱藏表格工具列與壓縮間距 */
     [data-testid="stElementToolbar"] { display: none !important; }
     div[data-testid="stDataEditor"] > div { max-height: 280px !important; }
     .element-container { margin-bottom: -10px !important; }
@@ -73,11 +74,10 @@ def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, im
 COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差"]
 DEFAULT_DATA = [
     {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "a", COLS[3]: "Panel mark to unit mark", COLS[4]: 0.1},
-    {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "b", COLS[3]: "Unit mark to soldering pad", COLS[4]: 0.1},
+    {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "b", COLS[3]: "Unit mark to pad", COLS[4]: 0.1},
     {COLS[0]: "SMT", COLS[1]: 1.0, COLS[2]: "c", COLS[3]: "SMT tolerance", COLS[4]: 0.15},
     {COLS[0]: "Connector", COLS[1]: 1.33, COLS[2]: "d", COLS[3]: "Connector housing", COLS[4]: 0.125}
 ]
-# 結論區預設格式
 DEFAULT_CONCL = "1. \n2. \n3. \n4. \n5. "
 
 def init_state(reset_all=False):
@@ -111,16 +111,14 @@ def action_all(mode):
     else: init_state(reset_all=True)
 
 # 5. 主介面繪製
-# 大型字標題
 st.markdown("<h2>設計累計公差分析工具 / Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=True)
-
 l_col, r_col = st.columns([1.3, 1])
 
 with l_col:
-    # 中型字區域標籤
     st.markdown('<p class="section-label">🖼️ Diagram & Input / 示意圖與數據輸入</p>', unsafe_allow_html=True)
     img_pdf = "4125.jpg" if st.session_state.show_img and os.path.exists("4125.jpg") else None
-    if img_pdf: st.image(img_pdf, use_container_width=True)
+    if img_pdf:
+        st.image(img_pdf, use_container_width=True)
     else:
         up = st.file_uploader("Upload New Diagram", type=["jpg", "png"])
         if up:
@@ -137,7 +135,6 @@ with l_col:
     bc2.button("🔄 Reset / 還原範例", on_click=action_all, args=("reset",), use_container_width=True)
 
 with r_col:
-    # 中型字區域標籤
     st.markdown('<p class="section-label">📋 Info & Results / 專案資訊與結果</p>', unsafe_allow_html=True)
     with st.container(border=True):
         p_n = st.text_input("Project Name 專案名稱", key="proj_name")
@@ -156,14 +153,13 @@ with r_col:
     yld = (2 * norm.cdf(3 * cpk) - 1) * 100
     
     res_c1, res_c2 = st.columns(2)
-    # 中型字分析標籤
     res_c1.metric("Worst Case (最壞情況)", f"± {wc:.3f}")
     res_c2.metric("RSS Total (均方根)", f"± {rss:.3f}")
     res_c1.metric("Est. CPK (預估 CPK)", f"{cpk:.2f}")
     res_c2.metric("Est. Yield (預估良率)", f"{yld:.2f} %")
 
+    # ✍️ 結論區標籤已調整為與右側資訊欄一致 (22px)
     st.divider()
-    # ✍️ 結論區標籤 (22px 中型字)
     con_in = st.text_area("✍️ Conclusion 結論 (Editable)", value=st.session_state.concl_text, height=180, key="concl_area")
     st.session_state.concl_text = con_in
 
