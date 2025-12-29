@@ -8,10 +8,11 @@ import os
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 st.markdown("""<style>
     .stApp { background-color: #f0f2f6; }
-    .main .block-container { padding-top: 2.5rem !important; padding-bottom: 0rem !important; }
+    /* 縮小邊距以符合 Window 介面全覽 */
+    .main .block-container { padding-top: 2.2rem !important; padding-bottom: 0rem !important; }
+    
     h2 { line-height: 1.1; font-size: 22px; text-align: center; margin-top: -1.5rem; margin-bottom: 10px; color: #333; }
     
-    /* 區域標籤樣式 */
     .section-label, [data-testid="stMetricLabel"], .stTextArea label p { 
         font-size: 18px !important; font-weight: bold !important; color: #333; 
     }
@@ -78,22 +79,22 @@ with l:
         current_img = "temp.png" if os.path.exists("temp.png") else ("4125.jpg" if os.path.exists("4125.jpg") else None)
         if current_img: st.image(current_img, use_container_width=True)
 
-    # 💡 數據編輯器：設定欄位寬度比例
+    # 💡 數據編輯器：根據圖片比例設定欄位寬度
     ed_df = st.data_editor(
         st.session_state.df_data, 
         num_rows="dynamic", 
         use_container_width=True,
         column_config={
-            COLS[0]: st.column_config.TextColumn(width="small"),      # Part (約 15%)
-            COLS[1]: st.column_config.TextColumn(width="small"),      # Req. CPK (約 15%)
-            COLS[2]: st.column_config.TextColumn(width="small"),      # No. (約 10%)
-            COLS[3]: st.column_config.TextColumn(width="large"),      # Description (約 45%)
-            COLS[4]: st.column_config.NumberColumn(width="small"),    # Tol. (約 15%)
+            COLS[0]: st.column_config.TextColumn(width="small"),      # Part 約 15%
+            COLS[1]: st.column_config.TextColumn(width="small"),      # Req. CPK 約 15%
+            COLS[2]: st.column_config.TextColumn(width="small"),      # No. 約 10%
+            COLS[3]: st.column_config.TextColumn(width="large"),      # Description 約 45%
+            COLS[4]: st.column_config.NumberColumn(width="small"),    # Tol. 約 15%
         }
     )
     st.session_state.df_data = ed_df
     
-    # 即時計算 Worst Case 連動
+    # 即時計算 Worst Case
     current_tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
     real_wc = current_tols.sum()
     if not st.session_state.is_cleared:
