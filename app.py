@@ -5,52 +5,59 @@ from scipy.stats import norm
 from fpdf import FPDF
 import os
 
-# 1. 頁面配置與 CSS 樣式 (優化輸入流暢度與佈局)
+# 1. 頁面配置與 CSS 樣式 (優化佈局並確保單屏顯示)
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 st.markdown("""<style>
-    .block-container { padding-top: 2.5rem !important; }
-    h2 { line-height: 1.4; font-size: 26px; text-align: center; }
-    .section-label, [data-testid="stMetricLabel"], .stTextArea label p { font-size: 22px !important; font-weight: bold; color: #333; }
-    [data-testid="stMetricValue"] { font-size: 30px !important; font-weight: bold; color: #1f77b4 !important; }
-    .stTextArea textarea { background-attachment: local; background-size: 100% 2.2em; line-height: 2.2em !important; height: 160px !important;
+    .block-container { padding-top: 2.0rem !important; }
+    h2 { line-height: 1.2; font-size: 24px; text-align: center; margin-bottom: 5px; }
+    .section-label, [data-testid="stMetricLabel"], .stTextArea label p { font-size: 20px !important; font-weight: bold; color: #333; }
+    [data-testid="stMetricValue"] { font-size: 28px !important; font-weight: bold; color: #1f77b4 !important; }
+    .stTextArea textarea { background-attachment: local; background-size: 100% 2.2em; line-height: 2.2em !important; height: 140px !important;
         background-image: linear-gradient(to right, white 0px, transparent 0px), linear-gradient(#e0e0e0 1px, transparent 1px); }
-    div[data-testid="stDataEditor"] > div { max-height: 280px !important; }
+    div[data-testid="stDataEditor"] > div { max-height: 260px !important; }
     [data-testid="stElementToolbar"] { display: none !important; }
-    .element-container { margin-bottom: -10px !important; }
+    .element-container { margin-bottom: -15px !important; }
 </style>""", unsafe_allow_html=True)
 
-# 2. PDF 產生函數 (強化容錯機制，確保新輸入數據不報錯)
+# 2. PDF 產生函數 (強化對新數據行的相容性)
 def create_pdf(proj, title, date, unit, target, wc, rss, cpk, yld, concl, df, img):
     pdf = FPDF(); pdf.add_page()
     pdf.set_font("Arial", 'B', 16); pdf.cell(190, 10, "Tolerance Stack-up Analysis Report", ln=True, align='C'); pdf.ln(2)
     pdf.set_font("Arial", 'B', 10); pdf.set_fill_color(240, 240, 240)
-    infos = [("Project Name:", proj), ("Analysis Title:", title), ("Date:", date), ("Unit:", unit), ("Target:", f"+/- {target:.3f}")]
-    for label, val in infos:
-        pdf.cell(40, 7, label, 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(150 if "Title" in label else 55, 7, str(val), 1, 1 if "Title" in label or "Unit" in label else 0)
+    infos = [("Project:", proj), ("Title:", title), ("Date:", date), ("Unit:", unit), ("Target:", f"+/- {target:.3f}")]
+    for l, v in infos:
+        pdf.cell(40, 7, l, 1, 0, 'L', True); pdf.set_font("Arial", '', 10); pdf.cell(150 if "Title" in l else 55, 7, str(v), 1, 1 if "Title" in l or "Unit" in l else 0)
     if img and os.path.exists(img): pdf.ln(2); pdf.image(img, x=10, w=110); pdf.ln(2)
     pdf.ln(2); pdf.set_font("Arial", 'B', 11); pdf.cell(190, 8, "Input Data Details:", ln=True)
     pdf.set_font("Arial", 'B', 9); pdf.set_fill_color(230, 230, 230)
     for h, w in [("Part", 30), ("No.", 20), ("Description", 100), ("Tol (+/-)", 40)]: pdf.cell(w, 7, h, 1, 0, 'C', True)
     pdf.ln(7); pdf.set_font("Arial", '', 9)
-    # 確保表格數據轉換為浮點數，若空值則跳過
+    # 過濾有效數據行進行匯出
     for _, r in df.iterrows():
         try:
-            val = float(r.iloc[4])
-            pdf.cell(30, 7, str(r.iloc[0]), 1); pdf.cell(20, 7, str(r.iloc[2]), 1); pdf.cell(100, 7, str(r.iloc[3]), 1); pdf.cell(40, 7, f"{val:.3f}", 1, 1)
+            v = float(r.iloc[4])
+            pdf.cell(30, 7, str(r.iloc[0]), 1); pdf.cell(20, 7, str(r.iloc[2]), 1); pdf.cell(100, 7, str(r.iloc[3]), 1); pdf.cell(40, 7, f"{v:.3f}", 1, 1)
         except: continue
     pdf.ln(4); pdf.set_font("Arial", 'B', 11); pdf.cell(190, 8, "Analysis Summary (RSS 3-Sigma):", ln=True)
-    pdf.cell(190, 10, f"Worst Case: {wc:.3f} | RSS Total: {rss:.3f} | CPK: {cpk:.2f} | Yield: {yld:.2f}%", 1, 1, 'C'); pdf.ln(4)
-    pdf.cell(190, 8, "Final Conclusion:", ln=True); pdf.set_font("Arial", 'I', 10); pdf.multi_cell(190, 6, concl)
+    pdf.cell(190, 10, f"Worst Case: {wc:.3f} | RSS Total: {rss:.3f} | CPK: {cpk:.2f} | Yield: {yld:.2f}%", 1, 1, 'C')
+    pdf.ln(4); pdf.cell(190, 8, "Final Conclusion:", ln=True); pdf.set_font("Arial", 'I', 10); pdf.multi_cell(190, 6, concl)
     return pdf.output(dest="S").encode("latin-1")
 
-# 3. 初始化 Session State
+# 3. 初始化 Session State (加入 a, b, c, d, e 初始值)
 COLS = ["Part 零件", "Req. CPK 要求", "No. 編號", "Description 描述", "Tol. 公差(±)"]
-def get_empty_df(rows=6): return pd.DataFrame([{c: "" for c in COLS} for _ in range(rows)])
+def get_init_df():
+    return pd.DataFrame([
+        {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "a", COLS[3]: "Panel mark to unit mark", COLS[4]: 0.1},
+        {COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "b", COLS[3]: "Unit mark to soldering pad", COLS[4]: 0.1},
+        {COLS[0]: "SMT", COLS[1]: 1.0, COLS[2]: "c", COLS[3]: "Assy Process", COLS[4]: 0.15},
+        {COLS[0]: "Connector", COLS[1]: 1.33, COLS[2]: "d", COLS[3]: "Connector housing", COLS[4]: 0.125},
+        {COLS[0]: "Other", COLS[1]: 1.0, COLS[2]: "e", COLS[3]: "Custom part", COLS[4]: 0.1}
+    ])
 
 DEFAULTS = {
-    "df_data": pd.DataFrame([{COLS[0]: "PCB", COLS[1]: 1.33, COLS[2]: "a", COLS[3]: "Panel mark", COLS[4]: 0.1},
-                             {COLS[0]: "Connector", COLS[1]: 1.33, COLS[2]: "d", COLS[3]: "Housing", COLS[4]: 0.125}]),
-    "target_val": 0.2, "proj_name": "TM-P4125-001", "analysis_title": "Connector Analysis", "date": "2025/12/29", "unit": "mm", "show_img": True, "concl_text": "", "uploaded_img": None
+    "df_data": get_init_df(), "target_val": 0.2, "proj_name": "TM-P4125-001", 
+    "analysis_title": "Connector Analysis", "date": "2025/12/29", "unit": "mm", 
+    "show_img": True, "concl_text": "", "uploaded_img": None
 }
 
 for k, v in DEFAULTS.items():
@@ -59,12 +66,12 @@ for k, v in DEFAULTS.items():
 def action(mode):
     if mode == "clear":
         for k in ["proj_name", "analysis_title", "date", "unit", "concl_text"]: st.session_state[k] = ""
-        st.session_state.df_data, st.session_state.target_val, st.session_state.show_img, st.session_state.uploaded_img = get_empty_df(6), 0.0, False, None
+        st.session_state.df_data, st.session_state.target_val, st.session_state.show_img, st.session_state.uploaded_img = pd.DataFrame([{c: "" for c in COLS} for _ in range(6)]), 0.0, False, None
     elif mode == "reset":
         for k, v in DEFAULTS.items(): st.session_state[k] = v
     st.rerun()
 
-# 4. 主介面
+# 4. 主介面繪製
 st.markdown("<h2>設計累計公差分析工具 / Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=True)
 l, r = st.columns([1.3, 1])
 
@@ -82,14 +89,13 @@ with l:
             with open("uploaded_temp.png", "wb") as f: f.write(up.getbuffer())
             st.session_state.uploaded_img = "uploaded_temp.png"; st.rerun()
 
-    # 💡 數據編輯器：透過 session_state 綁定解決輸入延遲與跳開問題
+    # 💡 數據編輯器：透過移除回調並簡化鍵值，解決輸入需兩次的問題
     ed_df = st.data_editor(st.session_state.df_data, num_rows="dynamic", use_container_width=True, key="main_editor")
     st.session_state.df_data = ed_df
     
     st.caption("💡 點擊左側序號選取並按 Delete 刪除。")
-    # 🛠️ 三個並排按鈕：清除、重新計算、還原
     bc1, bc2, bc3 = st.columns(3)
-    bc1.button("🗑️ Clear All / 全部清除", on_click=action, args=("clear",), use_container_width=True)
+    bc1.button("🗑️ Clear / 全部清除", on_click=action, args=("clear",), use_container_width=True)
     if bc2.button("🔄 Recalculate / 重新計算", use_container_width=True): st.rerun()
     bc3.button("⏪ Reset / 還原範例", on_click=action, args=("reset",), use_container_width=True)
 
@@ -102,23 +108,25 @@ with r:
     ts = st.number_input("Target Spec (±)", value=st.session_state.target_val, format="%.3f", key="target_input")
     st.session_state.target_val = ts
 
-    # 💡 強制數據即時同步與計算
+    # 💡 強制即時計算
     tol_vals = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
     wc, rss = tol_vals.sum(), np.sqrt((tol_vals**2).sum())
     cpk = ts / rss if rss != 0 else 0
     yld = (2 * norm.cdf(3 * cpk) - 1) * 100
     
+    # 恢復計算標題與 Metric
     res1, res2 = st.columns(2)
-    res1.metric("Worst Case", f"± {wc:.3f}"); res2.metric("RSS Total", f"± {rss:.3f}")
-    res1.metric("Est. CPK", f"{cpk:.2f}"); res2.metric("Est. Yield", f"{yld:.2f} %")
+    res1.metric("Worst Case (最壞情況)", f"± {wc:.3f}"); res2.metric("RSS Total (均方根)", f"± {rss:.3f}")
+    res1.metric("Est. CPK (預估 CPK)", f"{cpk:.2f}"); res2.metric("Est. Yield (預估良率)", f"{yld:.2f} %")
 
     st.divider()
-    auto_con = f"1. Target +/-{ts:.3f}, CPK {cpk:.2f}, Yield {yld:.2f}%.\n2. \n3. "
-    con_in = st.text_area("✍️ Conclusion 結論", value=st.session_state.concl_text or auto_con, height=160, key="concl_area")
+    con_auto = f"1. Target +/-{ts:.3f}, CPK {cpk:.2f}, Yield {yld:.2f}%.\n2. \n3. "
+    con_in = st.text_area("✍️ Conclusion 結論 (Editable)", value=st.session_state.concl_text or con_auto, height=140, key="concl_area")
     st.session_state.concl_text = con_in
     
     try:
-        pdf_img = st.session_state.uploaded_img if st.session_state.uploaded_img else (display_img if display_img != "uploaded_temp.png" else None)
+        # 修正圖片讀取邏輯確保 PDF 匯出成功
+        pdf_img = st.session_state.uploaded_img if st.session_state.uploaded_img else (display_img if (display_img and os.path.exists(display_img)) else None)
         pdf_b = create_pdf(pn, at, dt, ut, ts, wc, rss, cpk, yld, con_in, ed_df, pdf_img)
-        st.download_button("📥 Export PDF Report", data=pdf_b, file_name=f"Report_{pn}.pdf", use_container_width=True)
-    except: st.error("PDF Syncing Error... Please click 'Recalculate' button above.")
+        st.download_button("📥 Export PDF Report / 匯出報告", data=pdf_b, file_name=f"Report_{pn}.pdf", use_container_width=True)
+    except: st.error("PDF Syncing... Please click 'Recalculate' if error persists.")
