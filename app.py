@@ -8,24 +8,28 @@ import os
 # 1. 頁面配置 (Page Config)
 st.set_page_config(page_title="Tolerance Tool", layout="wide")
 
-# 2. CSS 樣式：優化佈局、字體一致化、結論區底線
+# 2. CSS 樣式：精確控制字體層次與佈局優化
 st.markdown("""
     <style>
-    /* 修正頂部邊距確保標題不切頂 */
+    /* 修正頂部邊距 */
     .block-container { padding-top: 2.5rem !important; padding-bottom: 0rem !important; }
     
-    /* 大型字 (Title Layer): 26px 加粗 */
+    /* 大型字 (Title): 26px 加粗 */
     h2 { line-height: 1.4 !important; font-size: 26px !important; text-align: center; margin-bottom: 10px !important; }
     
-    /* 中型字 (Section Labels): 22px 加粗 */
-    /* 統一所有區域標籤與結論標籤字體大小為 22px 加粗 */
-    .section-label, [data-testid="stMetricLabel"], .stTextArea label, .stSubheader h3 { 
+    /* 中型字 (Labels): 22px 加粗 - 強制覆蓋所有標籤 */
+    /* 包含區域標籤、Metric 標籤、以及關鍵的結論區標籤 (TextArea Label) */
+    .section-label, 
+    [data-testid="stMetricLabel"], 
+    .stTextArea label p, 
+    .stSubheader h3 { 
         font-size: 22px !important; 
         font-weight: bold !important; 
         color: #333 !important; 
+        margin-bottom: 5px !important;
     }
     
-    /* 結果數值字體放大至 30px */
+    /* 結果數值字體: 30px 加粗藍色 */
     [data-testid="stMetricValue"] { font-size: 30px !important; font-weight: bold !important; color: #1f77b4 !important; }
     
     /* 結論區底線間距優化 */
@@ -40,7 +44,7 @@ st.markdown("""
         padding-top: 8px !important;
     }
 
-    /* 隱藏表格工具列與壓縮間距 */
+    /* 佈局壓縮 */
     [data-testid="stElementToolbar"] { display: none !important; }
     div[data-testid="stDataEditor"] > div { max-height: 280px !important; }
     .element-container { margin-bottom: -10px !important; }
@@ -112,13 +116,13 @@ def action_all(mode):
 
 # 5. 主介面繪製
 st.markdown("<h2>設計累計公差分析工具 / Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=True)
+
 l_col, r_col = st.columns([1.3, 1])
 
 with l_col:
     st.markdown('<p class="section-label">🖼️ Diagram & Input / 示意圖與數據輸入</p>', unsafe_allow_html=True)
     img_pdf = "4125.jpg" if st.session_state.show_img and os.path.exists("4125.jpg") else None
-    if img_pdf:
-        st.image(img_pdf, use_container_width=True)
+    if img_pdf: st.image(img_pdf, use_container_width=True)
     else:
         up = st.file_uploader("Upload New Diagram", type=["jpg", "png"])
         if up:
@@ -158,8 +162,8 @@ with r_col:
     res_c1.metric("Est. CPK (預估 CPK)", f"{cpk:.2f}")
     res_c2.metric("Est. Yield (預估良率)", f"{yld:.2f} %")
 
-    # ✍️ 結論區標籤已調整為與右側資訊欄一致 (22px)
     st.divider()
+    # ✍️ 結論區標籤：CSS 已精確鎖定字體至 22px 加粗
     con_in = st.text_area("✍️ Conclusion 結論 (Editable)", value=st.session_state.concl_text, height=180, key="concl_area")
     st.session_state.concl_text = con_in
 
