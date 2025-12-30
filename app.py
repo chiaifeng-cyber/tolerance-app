@@ -15,7 +15,6 @@ st.markdown("""<style>
     }
     h2 { line-height: 1; font-size: 22px; text-align: center; margin-top: -1.5rem; margin-bottom: 10px; color: #1e1e1e; }
     
-    /* 區塊標籤樣式 */
     .section-label, [data-testid="stMetricLabel"], .stTextArea label p, .stNumberInput label p { 
         font-size: 16px !important; font-weight: bold !important; color: #333; 
         margin-bottom: 4px !important;
@@ -25,11 +24,10 @@ st.markdown("""<style>
     .table-hint-container {
         display: flex;
         align-items: center;
-        margin-top: -22px; /* 再次縮減，使其緊貼表格底部 */
+        margin-top: -22px; 
         margin-bottom: 8px;
         padding-left: 2px;
     }
-    /* 使用 CSS 繪製紅底白勾圖示，確保 100% 顯示 */
     .red-check-box {
         width: 14px;
         height: 14px;
@@ -44,13 +42,13 @@ st.markdown("""<style>
     .white-checkmark {
         width: 8px;
         height: 5px;
-        border-left: 2px solid white;
+        border-left: 2px solid white; /* 白勾 */
         border-bottom: 2px solid white;
         transform: rotate(-45deg);
         margin-top: -1px;
     }
     .hint-text {
-        font-size: 11.5px; /* 字體微調 */
+        font-size: 11.5px;
         color: #666;
         font-weight: normal;
     }
@@ -112,7 +110,6 @@ st.markdown("<h2>Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=Tru
 l, r = st.columns([1.4, 1])
 
 with l:
-    # --- Block 1: Diagram & Input ---
     st.markdown('<p class="section-label">🖼️ Diagram & Input</p>', unsafe_allow_html=True)
     with st.container(border=True):
         up = st.file_uploader("Upload", type=["jpg", "png", "jpeg"], label_visibility="collapsed", key=f"up_{st.session_state.uploader_key}")
@@ -139,7 +136,7 @@ with l:
     )
     st.session_state.df_data = ed_df
 
-    # 💡 修正後的紅底白勾提示文字與極窄間距
+    # 💡 紅底白勾提示標籤
     st.markdown("""
         <div class="table-hint-container">
             <div class="red-check-box"><div class="white-checkmark"></div></div>
@@ -155,7 +152,6 @@ with l:
     bc2.button("⏪ Reset to Default", on_click=action, args=("reset",), use_container_width=True)
 
 with r:
-    # --- Block 2: Project Information ---
     st.markdown('<p class="section-label">📋 Project Information</p>', unsafe_allow_html=True)
     with st.container(border=True):
         pn = st.text_input("Project Name", value="TM-P4125-001" if st.session_state.show_img else "", label_visibility="collapsed")
@@ -164,7 +160,6 @@ with r:
         dt = c1.text_input("Date", value="2025/12/30" if st.session_state.show_img else "", label_visibility="collapsed")
         ut = c2.text_input("Unit", value="mm" if st.session_state.show_img else "", label_visibility="collapsed")
     
-    # --- Block 3: Target Spec & Results ---
     st.markdown('<p class="section-label">⌨️ Target Spec (±)</p>', unsafe_allow_html=True)
     with st.container(border=True):
         ts = st.number_input("Target Spec", value=st.session_state.target_val, format="%.3f", label_visibility="collapsed")
@@ -175,8 +170,11 @@ with r:
         res1.metric("Est. CPK", f"{cpk_v:.2f}" if rss_v > 0 else ""); res2.metric("Est. Yield", f"{yld_v:.2f} %" if rss_v > 0 else "")
 
     
-    # --- Block 4: Conclusion ---
     st.markdown('<p class="section-label">✍️ Conclusion</p>', unsafe_allow_html=True)
     with st.container(border=True):
-        con_auto = f"1. Target +/-{ts:.3f}, CPK {cpk_v:.2f}, Yield {yld_v:.2f}%.\\n2. Use the RSS method for the spec. All calculated tolerances must meet a minimum Cpk of 1.0."
+        # 💡 修復：確保換行符號正確渲染，不再出現亂碼
+        con_auto = (
+            f"1. Target +/-{ts:.3f}, CPK {cpk_v:.2f}, Yield {yld_v:.2f}%.\n"
+            f"2. Use the RSS method for the spec. All calculated tolerances must meet a minimum Cpk of 1.0."
+        )
         st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=100, label_visibility="collapsed")
