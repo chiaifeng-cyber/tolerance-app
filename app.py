@@ -174,7 +174,8 @@ with r:
     with st.container(border=True):
         # 💡 修復：確保換行符號正確渲染，不再出現亂碼
         con_auto = (
-            f"1. Target +/-{ts:.3f}, CPK {cpk_v:.2f}, Yield {yld_v:.2f}%.\n"
-            f"2. Use the RSS method for the spec. All calculated tolerances must meet a minimum Cpk of 1.0."
+            f"1. If the Target is +/-{ts:.3f} mm. The estimated CPK {cpk_v:.2f}. The estimated yield {yld_v:.2f}%.\n"
+            f"2. Use the RSS method for the spec. All calculated tolerances must meet a minimum CPK of 1.0."
         )
         st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=100, label_visibility="collapsed")
+
