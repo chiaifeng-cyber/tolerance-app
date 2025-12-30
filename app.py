@@ -18,14 +18,26 @@ st.markdown("""<style>
         font-size: 16px !important; font-weight: bold !important; color: #333; 
         margin-bottom: 4px !important;
     }
-    /* 表格下方提示文字樣式 */
-    .table-hint {
-        font-size: 13px;
-        color: #666;
-        margin-top: -10px;
-        margin-bottom: 5px;
-        font-style: italic;
+
+    /* 💡 優化後的表格提示文字樣式 */
+    .table-hint-container {
+        display: flex;
+        align-items: center;
+        margin-top: -16px; /* 讓文字緊貼表格 */
+        margin-bottom: 8px;
+        padding-left: 5px;
     }
+    .hint-icon {
+        width: 14px;
+        height: 14px;
+        margin-right: 6px;
+    }
+    .hint-text {
+        font-size: 12px; /* 字體縮小 */
+        color: #666;
+        font-weight: normal;
+    }
+
     [data-testid="stImage"] img {
         max-height: 40vh !important;
         width: auto !important;
@@ -57,8 +69,7 @@ def get_init_df():
         {COLS[0]: "Connector", COLS[1]: "1.33", COLS[2]: "d", COLS[3]: "Connector housing (0.25/2)", COLS[4]: 0.125}
     ])
 
-if 'uploader_key' not in st.session_state:
-    st.session_state.uploader_key = 0
+if 'uploader_key' not in st.session_state: st.session_state.uploader_key = 0
 if 'df_data' not in st.session_state:
     st.session_state.df_data = get_init_df()
     st.session_state.target_val = 0.2
@@ -67,16 +78,10 @@ if 'df_data' not in st.session_state:
 def action(mode):
     st.session_state.uploader_key += 1
     if mode == "clear":
-        st.session_state.df_data = pd.DataFrame([
-            {COLS[0]: "", COLS[1]: "", COLS[2]: "", COLS[3]: "", COLS[4]: None} for _ in range(5)
-        ])
-        st.session_state.target_val = 0.0
-        st.session_state.show_img = False
+        st.session_state.df_data = pd.DataFrame([{COLS[0]: "", COLS[1]: "", COLS[2]: "", COLS[3]: "", COLS[4]: None} for _ in range(5)])
+        st.session_state.target_val, st.session_state.show_img = 0.0, False
     elif mode == "reset":
-        st.session_state.df_data = get_init_df()
-        st.session_state.target_val = 0.2
-        st.session_state.show_img = True
-    
+        st.session_state.df_data, st.session_state.target_val, st.session_state.show_img = get_init_df(), 0.2, True
     for ext in ["png", "jpg", "jpeg"]:
         f = f"temp.{ext}"
         if os.path.exists(f):
@@ -96,7 +101,6 @@ with l:
             ext = up.name.split('.')[-1].lower()
             with open(f"temp.{ext}", "wb") as f: f.write(up.getbuffer())
             st.session_state.show_img = True
-        
         if st.session_state.show_img:
             current_img = "temp.png" if os.path.exists("temp.png") else ("temp.jpg" if os.path.exists("temp.jpg") else ("temp.jpeg" if os.path.exists("temp.jpeg") else ("4125.jpg" if os.path.exists("4125.jpg") else None)))
             if current_img: st.image(current_img, use_container_width=True)
@@ -116,12 +120,16 @@ with l:
     )
     st.session_state.df_data = ed_df
 
-    # 💡 新增的操作提示文字
-    st.markdown('<p class="table-hint">💡 Select the row index on the far left and press "Delete" to remove a row.</p>', unsafe_allow_html=True)
+    # 💡 使用自定義 HTML 渲染新提示標籤
+    st.markdown(f"""
+        <div class="table-hint-container">
+            <img src="https://cdn-icons-png.flaticon.com/128/5290/5290058.png" class="hint-icon">
+            <span class="hint-text">Select the row index on the far left and press "Delete" to remove a row.</span>
+        </div>
+    """, unsafe_allow_html=True)
 
     tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
-    wc_v = tols.sum()
-    rss_v = np.sqrt((tols**2).sum())
+    wc_v, rss_v = tols.sum(), np.sqrt((tols**2).sum())
 
     bc1, bc2 = st.columns(2)
     bc1.button("🗑️ Clear All", on_click=action, args=("clear",), use_container_width=True)
@@ -135,25 +143,17 @@ with r:
         c1, c2 = st.columns(2)
         dt = c1.text_input("Date", value="2025/12/30" if st.session_state.show_img else "", label_visibility="collapsed")
         ut = c2.text_input("Unit", value="mm" if st.session_state.show_img else "", label_visibility="collapsed")
-    
     st.markdown('<p class="section-label">⌨️ Target Spec (±)</p>', unsafe_allow_html=True)
     with st.container(border=True):
         ts = st.number_input("Target Spec", value=st.session_state.target_val, format="%.3f", label_visibility="collapsed")
         st.session_state.target_val = ts
-
-        cpk_v = ts / rss_v if rss_v > 0 else 0
-        yld_v = (2 * norm.cdf(3 * cpk_v) - 1) * 100 if rss_v > 0 else 0
-
+        cpk_v, yld_v = (ts / rss_v if rss_v > 0 else 0), ((2 * norm.cdf(3 * (ts / rss_v if rss_v > 0 else 0)) - 1) * 100 if rss_v > 0 else 0)
         res1, res2 = st.columns(2)
-        res1.metric("Worst Case", f"± {wc_v:.3f}" if wc_v > 0 else "")
-        res2.metric("RSS Total", f"± {rss_v:.3f}" if rss_v > 0 else "")
-        res1.metric("Est. CPK", f"{cpk_v:.2f}" if rss_v > 0 else "")
-        res2.metric("Est. Yield", f"{yld_v:.2f} %" if rss_v > 0 else "")
+        res1.metric("Worst Case", f"± {wc_v:.3f}" if wc_v > 0 else ""); res2.metric("RSS Total", f"± {rss_v:.3f}" if rss_v > 0 else "")
+        res1.metric("Est. CPK", f"{cpk_v:.2f}" if rss_v > 0 else ""); res2.metric("Est. Yield", f"{yld_v:.2f} %" if rss_v > 0 else "")
 
+    
     st.markdown('<p class="section-label">✍️ Conclusion</p>', unsafe_allow_html=True)
     with st.container(border=True):
-        con_auto = (
-            f"1. Target +/-{ts:.3f}, CPK {cpk_v:.2f}, Yield {yld_v:.2f}%.\n"
-            f"2. Use the RSS method for the spec. All calculated tolerances must meet a minimum Cpk of 1.0."
-        )
+        con_auto = f"1. Target +/-{ts:.3f}, CPK {cpk_v:.2f}, Yield {yld_v:.2f}%.\n2. Use the RSS method for the spec. All calculated tolerances must meet a minimum Cpk of 1.0."
         st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=100, label_visibility="collapsed")
