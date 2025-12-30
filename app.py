@@ -19,22 +19,23 @@ st.markdown("""<style>
         margin-bottom: 4px !important;
     }
 
-    /* 💡 優化後的表格提示文字樣式 */
+    /* 💡 極致緊湊的表格提示文字樣式 */
     .table-hint-container {
         display: flex;
         align-items: center;
-        margin-top: -16px; /* 讓文字緊貼表格 */
-        margin-bottom: 8px;
-        padding-left: 5px;
+        margin-top: -18px; /* 負值增加，使文字更靠近表格 */
+        margin-bottom: 6px;
+        padding-left: 2px;
     }
     .hint-icon {
-        width: 14px;
-        height: 14px;
-        margin-right: 6px;
+        width: 12px; /* 圖示縮小 */
+        height: 12px;
+        margin-right: 4px;
+        border-radius: 2px;
     }
     .hint-text {
-        font-size: 12px; /* 字體縮小 */
-        color: #666;
+        font-size: 11px; /* 字體進一步縮小 */
+        color: #777;
         font-weight: normal;
     }
 
@@ -94,6 +95,7 @@ st.markdown("<h2>Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=Tru
 l, r = st.columns([1.4, 1])
 
 with l:
+    # --- Block 1: Diagram & Input with Container Border ---
     st.markdown('<p class="section-label">🖼️ Diagram & Input</p>', unsafe_allow_html=True)
     with st.container(border=True):
         up = st.file_uploader("Upload", type=["jpg", "png", "jpeg"], label_visibility="collapsed", key=f"up_{st.session_state.uploader_key}")
@@ -120,10 +122,10 @@ with l:
     )
     st.session_state.df_data = ed_df
 
-    # 💡 使用自定義 HTML 渲染新提示標籤
+    # 💡 紅底白勾提示標籤，使用更小的字體與極窄間距
     st.markdown(f"""
         <div class="table-hint-container">
-            <img src="https://cdn-icons-png.flaticon.com/128/5290/5290058.png" class="hint-icon">
+            <img src="https://cdn-icons-png.flaticon.com/128/1828/1828640.png" class="hint-icon">
             <span class="hint-text">Select the row index on the far left and press "Delete" to remove a row.</span>
         </div>
     """, unsafe_allow_html=True)
@@ -136,6 +138,7 @@ with l:
     bc2.button("⏪ Reset to Default", on_click=action, args=("reset",), use_container_width=True)
 
 with r:
+    # --- Block 2: Project Information ---
     st.markdown('<p class="section-label">📋 Project Information</p>', unsafe_allow_html=True)
     with st.container(border=True):
         pn = st.text_input("Project Name", value="TM-P4125-001" if st.session_state.show_img else "", label_visibility="collapsed")
@@ -143,6 +146,8 @@ with r:
         c1, c2 = st.columns(2)
         dt = c1.text_input("Date", value="2025/12/30" if st.session_state.show_img else "", label_visibility="collapsed")
         ut = c2.text_input("Unit", value="mm" if st.session_state.show_img else "", label_visibility="collapsed")
+    
+    # --- Block 3: Target Spec & Results ---
     st.markdown('<p class="section-label">⌨️ Target Spec (±)</p>', unsafe_allow_html=True)
     with st.container(border=True):
         ts = st.number_input("Target Spec", value=st.session_state.target_val, format="%.3f", label_visibility="collapsed")
@@ -153,6 +158,7 @@ with r:
         res1.metric("Est. CPK", f"{cpk_v:.2f}" if rss_v > 0 else ""); res2.metric("Est. Yield", f"{yld_v:.2f} %" if rss_v > 0 else "")
 
     
+    # --- Block 4: Conclusion ---
     st.markdown('<p class="section-label">✍️ Conclusion</p>', unsafe_allow_html=True)
     with st.container(border=True):
         con_auto = f"1. Target +/-{ts:.3f}, CPK {cpk_v:.2f}, Yield {yld_v:.2f}%.\n2. Use the RSS method for the spec. All calculated tolerances must meet a minimum Cpk of 1.0."
