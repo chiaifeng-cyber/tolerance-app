@@ -13,15 +13,19 @@ st.markdown("""<style>
         padding-bottom: 0rem !important; 
         max-width: 98% !important;
     }
-    
     h2 { line-height: 1; font-size: 22px; text-align: center; margin-top: -1.5rem; margin-bottom: 10px; color: #1e1e1e; }
-    
     .section-label, [data-testid="stMetricLabel"], .stTextArea label p, .stNumberInput label p { 
         font-size: 16px !important; font-weight: bold !important; color: #333; 
         margin-bottom: 4px !important;
     }
-
-    /* 限制圖片顯示高度，確保表格能同時顯示 */
+    /* 表格下方提示文字樣式 */
+    .table-hint {
+        font-size: 13px;
+        color: #666;
+        margin-top: -10px;
+        margin-bottom: 5px;
+        font-style: italic;
+    }
     [data-testid="stImage"] img {
         max-height: 40vh !important;
         width: auto !important;
@@ -29,22 +33,15 @@ st.markdown("""<style>
         margin-right: auto;
         display: block;
     }
-    
-    div[data-testid="stTextInput"] input, 
-    div[data-testid="stNumberInput"] input,
-    div[data-testid="stTextArea"] textarea {
+    div[data-testid="stTextInput"] input, div[data-testid="stNumberInput"] input, div[data-testid="stTextArea"] textarea {
         background-color: #ffffff !important;
         border-radius: 8px !important;
         padding: 4px 8px !important;
         border: 1px solid #d1d5db !important;
     }
-    
-    /* 壓縮組件間距 */
     [data-testid="stVerticalBlock"] > div { margin-bottom: 2px !important; gap: 0.4rem !important; }
-    
     div[data-testid="stDataEditor"] { background-color: #ffffff !important; border-radius: 8px !important; }
     [data-testid="stMetricValue"] { font-size: 22px !important; font-weight: bold; color: #1f77b4 !important; }
-    
     hr { display: none !important; }
     [data-testid="stElementToolbar"] { display: none !important; }
 </style>""", unsafe_allow_html=True)
@@ -92,26 +89,17 @@ st.markdown("<h2>Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=Tru
 l, r = st.columns([1.4, 1])
 
 with l:
-    # --- Block 1: Diagram & Input with Container Border ---
     st.markdown('<p class="section-label">🖼️ Diagram & Input</p>', unsafe_allow_html=True)
     with st.container(border=True):
-        up = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"], 
-                            label_visibility="collapsed", key=f"up_{st.session_state.uploader_key}")
+        up = st.file_uploader("Upload", type=["jpg", "png", "jpeg"], label_visibility="collapsed", key=f"up_{st.session_state.uploader_key}")
         if up:
             ext = up.name.split('.')[-1].lower()
             with open(f"temp.{ext}", "wb") as f: f.write(up.getbuffer())
             st.session_state.show_img = True
         
         if st.session_state.show_img:
-            current_img = None
-            for ext in ["png", "jpg", "jpeg"]:
-                if os.path.exists(f"temp.{ext}"):
-                    current_img = f"temp.{ext}"
-                    break
-            if not current_img and os.path.exists("4125.jpg"):
-                current_img = "4125.jpg"
-            if current_img: 
-                st.image(current_img, use_container_width=True)
+            current_img = "temp.png" if os.path.exists("temp.png") else ("temp.jpg" if os.path.exists("temp.jpg") else ("temp.jpeg" if os.path.exists("temp.jpeg") else ("4125.jpg" if os.path.exists("4125.jpg") else None)))
+            if current_img: st.image(current_img, use_container_width=True)
 
     # Data Editor
     ed_df = st.data_editor(
@@ -128,6 +116,9 @@ with l:
     )
     st.session_state.df_data = ed_df
 
+    # 💡 新增的操作提示文字
+    st.markdown('<p class="table-hint">💡 Select the row index on the far left and press "Delete" to remove a row.</p>', unsafe_allow_html=True)
+
     tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
     wc_v = tols.sum()
     rss_v = np.sqrt((tols**2).sum())
@@ -137,7 +128,6 @@ with l:
     bc2.button("⏪ Reset to Default", on_click=action, args=("reset",), use_container_width=True)
 
 with r:
-    # --- Block 2: Project Information ---
     st.markdown('<p class="section-label">📋 Project Information</p>', unsafe_allow_html=True)
     with st.container(border=True):
         pn = st.text_input("Project Name", value="TM-P4125-001" if st.session_state.show_img else "", label_visibility="collapsed")
@@ -146,7 +136,6 @@ with r:
         dt = c1.text_input("Date", value="2025/12/30" if st.session_state.show_img else "", label_visibility="collapsed")
         ut = c2.text_input("Unit", value="mm" if st.session_state.show_img else "", label_visibility="collapsed")
     
-    # --- Block 3: Target Spec & Results ---
     st.markdown('<p class="section-label">⌨️ Target Spec (±)</p>', unsafe_allow_html=True)
     with st.container(border=True):
         ts = st.number_input("Target Spec", value=st.session_state.target_val, format="%.3f", label_visibility="collapsed")
@@ -161,16 +150,10 @@ with r:
         res1.metric("Est. CPK", f"{cpk_v:.2f}" if rss_v > 0 else "")
         res2.metric("Est. Yield", f"{yld_v:.2f} %" if rss_v > 0 else "")
 
-    
-    # --- Block 4: Conclusion ---
     st.markdown('<p class="section-label">✍️ Conclusion</p>', unsafe_allow_html=True)
     with st.container(border=True):
         con_auto = (
-            f"1. If the target spec is +/-{ts:.3f} mm, the estimated CPK is {cpk_v:.2f} and the estimated yield is {yld_v:.2f}%.\n"
+            f"1. Target +/-{ts:.3f}, CPK {cpk_v:.2f}, Yield {yld_v:.2f}%.\n"
             f"2. Use the RSS method for the spec. All calculated tolerances must meet a minimum Cpk of 1.0."
         )
         st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=100, label_visibility="collapsed")
-
-
-
-
