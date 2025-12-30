@@ -14,28 +14,44 @@ st.markdown("""<style>
         max-width: 98% !important;
     }
     h2 { line-height: 1; font-size: 22px; text-align: center; margin-top: -1.5rem; margin-bottom: 10px; color: #1e1e1e; }
+    
+    /* 區塊標籤樣式 */
     .section-label, [data-testid="stMetricLabel"], .stTextArea label p, .stNumberInput label p { 
         font-size: 16px !important; font-weight: bold !important; color: #333; 
         margin-bottom: 4px !important;
     }
 
-    /* 💡 極致緊湊的表格提示文字樣式 */
+    /* 💡 修正提示標籤：紅底白勾圖示與極窄間距 */
     .table-hint-container {
         display: flex;
         align-items: center;
-        margin-top: -18px; /* 負值增加，使文字更靠近表格 */
-        margin-bottom: 6px;
+        margin-top: -22px; /* 再次縮減，使其緊貼表格底部 */
+        margin-bottom: 8px;
         padding-left: 2px;
     }
-    .hint-icon {
-        width: 12px; /* 圖示縮小 */
-        height: 12px;
-        margin-right: 4px;
-        border-radius: 2px;
+    /* 使用 CSS 繪製紅底白勾圖示，確保 100% 顯示 */
+    .red-check-box {
+        width: 14px;
+        height: 14px;
+        background-color: #ff4b4b; /* 紅底 */
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 6px;
+        flex-shrink: 0;
+    }
+    .white-checkmark {
+        width: 8px;
+        height: 5px;
+        border-left: 2px solid white;
+        border-bottom: 2px solid white;
+        transform: rotate(-45deg);
+        margin-top: -1px;
     }
     .hint-text {
-        font-size: 11px; /* 字體進一步縮小 */
-        color: #777;
+        font-size: 11.5px; /* 字體微調 */
+        color: #666;
         font-weight: normal;
     }
 
@@ -55,6 +71,7 @@ st.markdown("""<style>
     [data-testid="stVerticalBlock"] > div { margin-bottom: 2px !important; gap: 0.4rem !important; }
     div[data-testid="stDataEditor"] { background-color: #ffffff !important; border-radius: 8px !important; }
     [data-testid="stMetricValue"] { font-size: 22px !important; font-weight: bold; color: #1f77b4 !important; }
+    
     hr { display: none !important; }
     [data-testid="stElementToolbar"] { display: none !important; }
 </style>""", unsafe_allow_html=True)
@@ -95,7 +112,7 @@ st.markdown("<h2>Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=Tru
 l, r = st.columns([1.4, 1])
 
 with l:
-    # --- Block 1: Diagram & Input with Container Border ---
+    # --- Block 1: Diagram & Input ---
     st.markdown('<p class="section-label">🖼️ Diagram & Input</p>', unsafe_allow_html=True)
     with st.container(border=True):
         up = st.file_uploader("Upload", type=["jpg", "png", "jpeg"], label_visibility="collapsed", key=f"up_{st.session_state.uploader_key}")
@@ -122,10 +139,10 @@ with l:
     )
     st.session_state.df_data = ed_df
 
-    # 💡 紅底白勾提示標籤，使用更小的字體與極窄間距
-    st.markdown(f"""
+    # 💡 修正後的紅底白勾提示文字與極窄間距
+    st.markdown("""
         <div class="table-hint-container">
-            <img src="https://cdn-icons-png.flaticon.com/128/1828/1828640.png" class="hint-icon">
+            <div class="red-check-box"><div class="white-checkmark"></div></div>
             <span class="hint-text">Select the row index on the far left and press "Delete" to remove a row.</span>
         </div>
     """, unsafe_allow_html=True)
@@ -161,5 +178,5 @@ with r:
     # --- Block 4: Conclusion ---
     st.markdown('<p class="section-label">✍️ Conclusion</p>', unsafe_allow_html=True)
     with st.container(border=True):
-        con_auto = f"1. Target +/-{ts:.3f}, CPK {cpk_v:.2f}, Yield {yld_v:.2f}%.\n2. Use the RSS method for the spec. All calculated tolerances must meet a minimum Cpk of 1.0."
+        con_auto = f"1. Target +/-{ts:.3f}, CPK {cpk_v:.2f}, Yield {yld_v:.2f}%.\\n2. Use the RSS method for the spec. All calculated tolerances must meet a minimum Cpk of 1.0."
         st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=100, label_visibility="collapsed")
