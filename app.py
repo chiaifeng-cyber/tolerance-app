@@ -168,5 +168,6 @@ with r:
         )
         st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=100, label_visibility="collapsed")
         # 💡 加入製作資訊
-        st.markdown('<div class="APP-made-by-leo">App Made by Leo</div>', unsafe_allow_html=True)
+        st.markdown('<div class="made-by-leo">App Made by Leo</div>', unsafe_allow_html=True)
+
 
