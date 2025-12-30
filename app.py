@@ -82,7 +82,7 @@ def get_init_df():
         {COLS[0]: "PCB", COLS[1]: "1.33", COLS[2]: "a", COLS[3]: "Panel mark to unit mark", COLS[4]: 0.100},
         {COLS[0]: "PCB", COLS[1]: "1.33", COLS[2]: "b", COLS[3]: "Unit mark to soldering pad", COLS[4]: 0.100},
         {COLS[0]: "SMT", COLS[1]: "1.0", COLS[2]: "c", COLS[3]: "Assembly process", COLS[4]: 0.150},
-        {COLS[0]: "Connector", COLS[1]: "1.33", COLS[2]: "d", COLS[3]: "Connector housing (0.25/2)", COLS[4]: 0.125}
+        {COLS[0]: "Connector", COLS[1]: "1.33", COLS[2]: "d", COLS[3]: "Connector housing outline (0.25/2)", COLS[4]: 0.125}
     ])
 
 if 'uploader_key' not in st.session_state: st.session_state.uploader_key = 0
@@ -178,5 +178,6 @@ with r:
             f"2. Use the RSS method for the spec. All calculated tolerances must meet a minimum CPK of 1.0."
         )
         st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=100, label_visibility="collapsed")
+
 
 
