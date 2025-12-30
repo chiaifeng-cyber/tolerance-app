@@ -15,25 +15,25 @@ st.markdown("""<style>
     }
     h2 { line-height: 1; font-size: 22px; text-align: center; margin-top: -1.5rem; margin-bottom: 10px; color: #1e1e1e; }
     
-    /* 區塊標題樣式 */
     .section-label, [data-testid="stMetricLabel"], .stTextArea label p, .stNumberInput label p { 
         font-size: 16px !important; font-weight: bold !important; color: #333; 
         margin-bottom: 4px !important;
     }
 
-    /* 💡 修復：專案資訊欄位標題改為精緻小字 */
     div[data-testid="stTextInput"] label p {
         font-size: 11px !important;
         color: #666 !important;
         margin-bottom: -5px !important;
     }
 
-    /* 💡 縮小 Diagram & Input 區域內的文字 */
-    [data-testid="stFileUploader"] label p { font-size: 12px !important; }
-    [data-testid="stFileUploader"] section > div > div > span { font-size: 11px !important; }
-    [data-testid="stFileUploader"] button { font-size: 11px !important; }
+    /* 💡 底部製作資訊小字樣式 */
+    .made-by-leo {
+        font-size: 10px;
+        color: #aaa;
+        text-align: right;
+        margin-top: 5px;
+    }
 
-    /* 💡 紅底白勾提示標籤 */
     .table-hint-container {
         display: flex;
         align-items: center;
@@ -141,10 +141,8 @@ with l:
     bc2.button("⏪ Reset to Default", on_click=action, args=("reset",), use_container_width=True)
 
 with r:
-    # --- Block 2: Project Information (修復文字顯示) ---
     st.markdown('<p class="section-label">📋 Project Information</p>', unsafe_allow_html=True)
     with st.container(border=True):
-        # 💡 將 label_visibility 改回預設（visible）以修復文字不見的問題
         pn = st.text_input("Project Name", value="TM-P4125-001" if st.session_state.show_img else "")
         at = st.text_input("Analysis Title", value="Connector Analysis" if st.session_state.show_img else "")
         c1, c2 = st.columns(2)
@@ -161,6 +159,7 @@ with r:
         res1.metric("Est. CPK", f"{cpk_v:.2f}" if rss_v > 0 else ""); res2.metric("Est. Yield", f"{yld_v:.2f} %" if rss_v > 0 else "")
 
     
+
     st.markdown('<p class="section-label">✍️ Conclusion</p>', unsafe_allow_html=True)
     with st.container(border=True):
         con_auto = (
@@ -168,3 +167,5 @@ with r:
             f"2. Use the RSS method for the spec. All calculated tolerances must meet a minimum CPK of 1.0."
         )
         st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=100, label_visibility="collapsed")
+        # 💡 加入製作資訊
+        st.markdown('<div class="made-by-leo">Made by Leo</div>', unsafe_allow_html=True)
