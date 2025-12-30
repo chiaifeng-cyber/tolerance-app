@@ -15,26 +15,25 @@ st.markdown("""<style>
     }
     h2 { line-height: 1; font-size: 22px; text-align: center; margin-top: -1.5rem; margin-bottom: 10px; color: #1e1e1e; }
     
+    /* 區塊標題樣式 */
     .section-label, [data-testid="stMetricLabel"], .stTextArea label p, .stNumberInput label p { 
         font-size: 16px !important; font-weight: bold !important; color: #333; 
         margin-bottom: 4px !important;
     }
 
-    /* 💡 縮小 Diagram & Input 區域內的文字 */
-    [data-testid="stFileUploader"] section { 
-        padding: 0px 10px !important; 
-    }
-    [data-testid="stFileUploader"] label p { 
-        font-size: 12px !important; /* 縮小 Upload 標題文字 */
-    }
-    [data-testid="stFileUploader"] section > div > div > span {
-        font-size: 11px !important; /* 縮小 Drag and drop 提示文字 */
-    }
-    [data-testid="stFileUploader"] button {
-        font-size: 11px !important; /* 縮小 Browse files 按鈕文字 */
+    /* 💡 修復：專案資訊欄位標題改為精緻小字 */
+    div[data-testid="stTextInput"] label p {
+        font-size: 11px !important;
+        color: #666 !important;
+        margin-bottom: -5px !important;
     }
 
-    /* 💡 極致緊湊的表格提示標籤 */
+    /* 💡 縮小 Diagram & Input 區域內的文字 */
+    [data-testid="stFileUploader"] label p { font-size: 12px !important; }
+    [data-testid="stFileUploader"] section > div > div > span { font-size: 11px !important; }
+    [data-testid="stFileUploader"] button { font-size: 11px !important; }
+
+    /* 💡 紅底白勾提示標籤 */
     .table-hint-container {
         display: flex;
         align-items: center;
@@ -43,42 +42,23 @@ st.markdown("""<style>
         padding-left: 2px;
     }
     .red-check-box {
-        width: 14px;
-        height: 14px;
-        background-color: #ff4b4b;
-        border-radius: 3px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 6px;
-        flex-shrink: 0;
+        width: 14px; height: 14px; background-color: #ff4b4b; border-radius: 3px;
+        display: flex; align-items: center; justify-content: center; margin-right: 6px; flex-shrink: 0;
     }
     .white-checkmark {
-        width: 8px;
-        height: 5px;
-        border-left: 2px solid white;
-        border-bottom: 2px solid white;
-        transform: rotate(-45deg);
-        margin-top: -1px;
+        width: 8px; height: 5px; border-left: 2px solid white; border-bottom: 2px solid white;
+        transform: rotate(-45deg); margin-top: -1px;
     }
-    .hint-text {
-        font-size: 11px; /* 提示文字字體縮小 */
-        color: #666;
-        font-weight: normal;
-    }
+    .hint-text { font-size: 11px; color: #666; font-weight: normal; }
 
     [data-testid="stImage"] img {
         max-height: 40vh !important;
         width: auto !important;
-        margin-left: auto;
-        margin-right: auto;
-        display: block;
+        margin-left: auto; margin-right: auto; display: block;
     }
     div[data-testid="stTextInput"] input, div[data-testid="stNumberInput"] input, div[data-testid="stTextArea"] textarea {
-        background-color: #ffffff !important;
-        border-radius: 8px !important;
-        padding: 4px 8px !important;
-        border: 1px solid #d1d5db !important;
+        background-color: #ffffff !important; border-radius: 8px !important;
+        padding: 4px 8px !important; border: 1px solid #d1d5db !important;
     }
     [data-testid="stVerticalBlock"] > div { margin-bottom: 2px !important; gap: 0.4rem !important; }
     div[data-testid="stDataEditor"] { background-color: #ffffff !important; border-radius: 8px !important; }
@@ -124,7 +104,6 @@ st.markdown("<h2>Design Tolerance Stack-up Analysis</h2>", unsafe_allow_html=Tru
 l, r = st.columns([1.4, 1])
 
 with l:
-    # --- Block 1: Diagram & Input ---
     st.markdown('<p class="section-label">🖼️ Diagram & Input</p>', unsafe_allow_html=True)
     with st.container(border=True):
         up = st.file_uploader("Upload", type=["jpg", "png", "jpeg"], label_visibility="collapsed", key=f"up_{st.session_state.uploader_key}")
@@ -136,11 +115,8 @@ with l:
             current_img = "temp.png" if os.path.exists("temp.png") else ("temp.jpg" if os.path.exists("temp.jpg") else ("temp.jpeg" if os.path.exists("temp.jpeg") else ("4125.jpg" if os.path.exists("4125.jpg") else None)))
             if current_img: st.image(current_img, use_container_width=True)
 
-    # Data Editor
     ed_df = st.data_editor(
-        st.session_state.df_data, 
-        num_rows="dynamic", 
-        use_container_width=True,
+        st.session_state.df_data, num_rows="dynamic", use_container_width=True,
         column_config={
             COLS[0]: st.column_config.TextColumn(width="small"),
             COLS[1]: st.column_config.TextColumn(width="medium"),
@@ -151,8 +127,7 @@ with l:
     )
     st.session_state.df_data = ed_df
 
-    # 💡 紅底白勾提示標籤
-    st.markdown("""
+    st.markdown(f"""
         <div class="table-hint-container">
             <div class="red-check-box"><div class="white-checkmark"></div></div>
             <span class="hint-text">Select the row index on the far left and press "Delete" to remove a row.</span>
@@ -161,22 +136,21 @@ with l:
 
     tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
     wc_v, rss_v = tols.sum(), np.sqrt((tols**2).sum())
-
     bc1, bc2 = st.columns(2)
     bc1.button("🗑️ Clear All", on_click=action, args=("clear",), use_container_width=True)
     bc2.button("⏪ Reset to Default", on_click=action, args=("reset",), use_container_width=True)
 
 with r:
-    # --- Block 2: Project Information ---
+    # --- Block 2: Project Information (修復文字顯示) ---
     st.markdown('<p class="section-label">📋 Project Information</p>', unsafe_allow_html=True)
     with st.container(border=True):
-        pn = st.text_input("Project Name", value="TM-P4125-001" if st.session_state.show_img else "", label_visibility="collapsed")
-        at = st.text_input("Analysis Title", value="Connector Analysis" if st.session_state.show_img else "", label_visibility="collapsed")
+        # 💡 將 label_visibility 改回預設（visible）以修復文字不見的問題
+        pn = st.text_input("Project Name", value="TM-P4125-001" if st.session_state.show_img else "")
+        at = st.text_input("Analysis Title", value="Connector Analysis" if st.session_state.show_img else "")
         c1, c2 = st.columns(2)
-        dt = c1.text_input("Date", value="2025/12/30" if st.session_state.show_img else "", label_visibility="collapsed")
-        ut = c2.text_input("Unit", value="mm" if st.session_state.show_img else "", label_visibility="collapsed")
+        dt = c1.text_input("Date", value="2025/12/30" if st.session_state.show_img else "")
+        ut = c2.text_input("Unit", value="mm" if st.session_state.show_img else "")
     
-    # --- Block 3: Target Spec & Results ---
     st.markdown('<p class="section-label">⌨️ Target Spec (±)</p>', unsafe_allow_html=True)
     with st.container(border=True):
         ts = st.number_input("Target Spec", value=st.session_state.target_val, format="%.3f", label_visibility="collapsed")
@@ -187,7 +161,6 @@ with r:
         res1.metric("Est. CPK", f"{cpk_v:.2f}" if rss_v > 0 else ""); res2.metric("Est. Yield", f"{yld_v:.2f} %" if rss_v > 0 else "")
 
     
-    # --- Block 4: Conclusion ---
     st.markdown('<p class="section-label">✍️ Conclusion</p>', unsafe_allow_html=True)
     with st.container(border=True):
         con_auto = (
