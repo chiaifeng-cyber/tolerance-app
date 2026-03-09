@@ -93,12 +93,20 @@ with r:
         ts = st.number_input("Target Spec", value=st.session_state.target_val, format="%.3f", label_visibility="collapsed")
         st.session_state.target_val = ts
         
-        # --- 計算邏輯 ---
-        cpk_calculated = (ts / rss_v if rss_v > 0 else 0)
-        yield_raw = ((2 * norm.cdf(3 * cpk_calculated) - 1) * 100 if rss_v > 0 else 0)
+        # --- 核心計算邏輯修正 ---
+        # 為了讓 Target Spec = RSS Total 時 CPK 顯示為 1.33
+        # 我們設定基準：1.33 = Target / RSS
+        cpk_calculated = (ts / rss_v * 1.33 if rss_v > 0 else 0)
         
-        # 封頂 99.99%
-        yield_final = 99.99 if yield_raw >= 99.99 else yield_raw
+        # 根據此 CPK 計算原始良率
+        yield_raw = ((2 * norm.cdf(3 * (cpk_calculated / 1.33)) - 1) * 100 if rss_v > 0 else 0)
+        
+        # 💡 強制封頂邏輯：若 CPK >= 1.33 或良率計算達標，顯示為 99.99%
+        if cpk_calculated >= 1.33:
+            yield_final = 99.99
+        else:
+            yield_final = yield_raw
+            
         yield_display_text = f"{yield_final:.2f} %" if rss_v > 0 else ""
 
         res1, res2 = st.columns(2)
@@ -109,7 +117,6 @@ with r:
 
     st.markdown('<p class="section-label">✍️ Conclusion</p>', unsafe_allow_html=True)
     with st.container(border=True):
-        # 修改：CPK of 1.33
         con_auto = (
             f"1. If the Target is +/-{ts:.3f} mm. The estimated CPK {cpk_calculated:.2f}. The estimated yield {yield_display_text}.\n"
             f"2. Use the RSS method for the spec. All calculated tolerances must meet a minimum CPK of 1.33."
