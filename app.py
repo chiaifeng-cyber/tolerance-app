@@ -114,5 +114,6 @@ with r:
             f"2. Use the RSS method for the spec. All calculated tolerances must meet a minimum CPK of 1.33."
         )
         st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=100, label_visibility="collapsed")
-        st.markdown('<div class="made-by-leo-Oliver">App Made by Leo Oliver</div>', unsafe_allow_html=True)
+        st.markdown('<div class="made-by-leo-Oliver">App Made by Leo & Oliver</div>', unsafe_allow_html=True)
+
 
