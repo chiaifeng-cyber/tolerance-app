@@ -72,7 +72,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 2. Data Initialization
-COLS = ["Part", "Req. CPK (min. 1.0)", "No.", "Description", "Tol. (±)"]
+COLS = ["Part", "Req. CPK (min. 1.33)", "No.", "Description", "Tol. (±)"]
 
 def get_init_df():
     # 修正資料順序：SMT 在第一列
@@ -180,3 +180,4 @@ with r:
         )
         st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=100, label_visibility="collapsed")
         st.markdown('<div class="made-by-leo-Oliver">App Made by Leo Oliver</div>', unsafe_allow_html=True)
+
