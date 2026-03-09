@@ -15,7 +15,6 @@ st.markdown(f'<style>{css}</style>', unsafe_allow_html=True)
 COLS = ["Part", "Req. CPK (min. 1.0)", "No.", "Description", "Tol. (±)"]
 
 def get_init_df():
-    # SMT 置於首位
     return pd.DataFrame([
         {COLS[0]: "SMT", COLS[1]: "1.33", COLS[2]: "c", COLS[3]: "Assembly process", COLS[4]: 0.150},
         {COLS[0]: "PCB", COLS[1]: "1.33", COLS[2]: "a", COLS[3]: "Panel mark to unit mark", COLS[4]: 0.100},
@@ -70,7 +69,6 @@ with l:
         }
     )
     st.session_state.df_data = ed_df
-
     st.markdown(f'<div class="table-hint-container"><div class="red-check-box"><div class="white-checkmark"></div></div><span class="hint-text">Select the row index on the far left and press "Delete" to remove a row.</span></div>', unsafe_allow_html=True)
 
     tols = pd.to_numeric(ed_df[COLS[4]], errors='coerce').fillna(0)
@@ -85,40 +83,39 @@ with r:
         pn = st.text_input("Project Name", value="TM-P4125-001" if st.session_state.show_img else "")
         at = st.text_input("Analysis Title", value="Connector Analysis" if st.session_state.show_img else "")
         c1, c2 = st.columns(2)
-        dt = c1.text_input("Date", value="2025/12/30" if st.session_state.show_img else "")
-        ut = c2.text_input("Unit", value="mm" if st.session_state.show_img else "")
+        dt = st.text_input("Date", value="2025/12/30" if st.session_state.show_img else "")
+        ut = st.text_input("Unit", value="mm" if st.session_state.show_img else "")
     
     st.markdown('<p class="section-label">⌨️ Target Spec (±)</p>', unsafe_allow_html=True)
     with st.container(border=True):
         ts = st.number_input("Target Spec", value=st.session_state.target_val, format="%.3f", label_visibility="collapsed")
         st.session_state.target_val = ts
         
-        # --- 核心計算邏輯修正 ---
-        # 為了讓 Target Spec = RSS Total 時 CPK 顯示為 1.33
-        # 我們設定基準：1.33 = Target / RSS
-        cpk_calculated = (ts / rss_v * 1.33 if rss_v > 0 else 0)
+        # --- 核心邏輯修正區 ---
+        # 1. 計算 CPK (當 Target = RSS 時，值為 1.33)
+        cpk_v = (ts / rss_v * 1.33 if rss_v > 0 else 0)
         
-        # 根據此 CPK 計算原始良率
-        yield_raw = ((2 * norm.cdf(3 * (cpk_calculated / 1.33)) - 1) * 100 if rss_v > 0 else 0)
-        
-        # 💡 強制封頂邏輯：若 CPK >= 1.33 或良率計算達標，顯示為 99.99%
-        if cpk_calculated >= 1.33:
-            yield_final = 99.99
+        # 2. 判斷良率顯示
+        # 只要 CPK 大於等於 1.33，良率一律鎖定在 99.99%
+        if rss_v == 0:
+            yld_text = ""
+        elif cpk_v >= 1.33:
+            yld_text = "99.99 %"
         else:
-            yield_final = yield_raw
-            
-        yield_display_text = f"{yield_final:.2f} %" if rss_v > 0 else ""
+            # 若小於 1.33，則按常態分佈計算 (以 1.33 為 4-sigma 基準)
+            yld_val = (2 * norm.cdf(3 * (cpk_v / 1.33)) - 1) * 100
+            yld_text = f"{yld_val:.2f} %"
 
         res1, res2 = st.columns(2)
         res1.metric("Worst Case", f"± {wc_v:.3f}" if wc_v > 0 else "")
         res2.metric("RSS Total", f"± {rss_v:.3f}" if rss_v > 0 else "")
-        res1.metric("Est. CPK", f"{cpk_calculated:.2f}" if rss_v > 0 else "")
-        res2.metric("Est. Yield", yield_display_text)
+        res1.metric("Est. CPK", f"{cpk_v:.2f}" if rss_v > 0 else "")
+        res2.metric("Est. Yield", yld_text)
 
     st.markdown('<p class="section-label">✍️ Conclusion</p>', unsafe_allow_html=True)
     with st.container(border=True):
         con_auto = (
-            f"1. If the Target is +/-{ts:.3f} mm. The estimated CPK {cpk_calculated:.2f}. The estimated yield {yield_display_text}.\n"
+            f"1. If the Target is +/-{ts:.3f} mm. The estimated CPK {cpk_v:.2f}. The estimated yield {yld_text}.\n"
             f"2. Use the RSS method for the spec. All calculated tolerances must meet a minimum CPK of 1.33."
         )
         st.text_area("Conclusion", value=con_auto if wc_v > 0 else "", height=100, label_visibility="collapsed")
